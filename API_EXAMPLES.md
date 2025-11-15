@@ -6,7 +6,7 @@ Complete examples of all API requests with request bodies and expected responses
 
 ## 🔐 Authentication APIs
 
-### 1. Register New User
+### 1. Register New Supplier Account
 
 **Request:**
 ```http
@@ -14,8 +14,8 @@ POST http://localhost:3000/api/auth/register
 Content-Type: application/json
 
 {
-  "name": "John Doe",
-  "email": "john@example.com",
+  "name": "Urban Supply Co.",
+  "email": "supplier@example.com",
   "password": "password123",
   "phone": "1234567890"
 }
@@ -28,6 +28,11 @@ Content-Type: application/json
   "message": "OTP sent to email."
 }
 ```
+
+**Note:** 
+- `name` is your **Business Name** (e.g., "Urban Supply Co.", "Builders Depot")
+- After registration, check your email for the 4-digit OTP code
+- You'll need to verify the OTP before you can login
 
 ---
 
@@ -112,8 +117,8 @@ POST http://localhost:3000/api/auth/change-email
 Content-Type: application/json
 
 {
-  "oldEmail": "john@example.com",
-  "newEmail": "john.new@example.com"
+  "oldEmail": "supplier@example.com",
+  "newEmail": "newemail@example.com"
 }
 ```
 
@@ -122,15 +127,19 @@ Content-Type: application/json
 {
   "success": true,
   "message": "Email changed successfully. OTP sent to new email.",
-  "newEmail": "john.new@example.com"
+  "newEmail": "newemail@example.com"
 }
 ```
 
-**Note:** This endpoint allows users to change their email address before completing OTP verification. A new OTP will be sent to the new email address.
+**Note:** 
+- Use this endpoint if you entered the wrong email during registration
+- Only works if you haven't verified your OTP yet (account is still pending verification)
+- A new OTP will be automatically sent to your new email address
+- You can then verify with the new email and OTP
 
 ---
 
-### 6. Create Test Users (For Testing Only)
+<!-- ### 6. Create Test Users (For Testing Only)
 
 **Request:**
 ```http
@@ -186,10 +195,10 @@ Content-Type: application/json
     }
   ],
   "note": "All test users have password: Test123!"
-}
+} -->
 ```
 
-**Note:** This endpoint creates 5 pre-configured test supplier accounts for testing purposes. All test users have the password `Test123!`. The OTP is included in the response for easy testing. If a user already exists, it will be skipped and listed in the `errors` array.
+<!-- **Note:** This endpoint creates 5 pre-configured test supplier accounts for testing purposes. All test users have the password `Test123!`. The OTP is included in the response for easy testing. If a user already exists, it will be skipped and listed in the `errors` array. -->
 
 ---
 
