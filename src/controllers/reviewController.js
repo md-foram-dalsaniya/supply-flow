@@ -88,7 +88,7 @@ exports.getReviews = async (req, res) => {
         console.error('❌ Get reviews error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching reviews',
+            message: 'Failed to fetch reviews',
         });
     }
 };
@@ -144,7 +144,7 @@ exports.getReviewSummary = async (req, res) => {
         console.error('❌ Get review summary error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching review summary',
+            message: 'Failed to fetch review summary',
         });
     }
 };
@@ -346,7 +346,7 @@ exports.addReply = async (req, res) => {
         console.error('❌ Add reply error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while adding reply',
+            message: 'Failed to add reply',
         });
     }
 };
@@ -448,7 +448,7 @@ exports.deleteReview = async (req, res) => {
         console.error('❌ Delete review error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while deleting review',
+            message: 'Failed to delete review',
         });
     }
 };

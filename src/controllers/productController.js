@@ -2,9 +2,6 @@ const Product = require('../models/Product');
 const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
 
-// @desc    Get all products
-// @route   GET /api/products
-// @access  Private
 exports.getProducts = async (req, res) => {
     try {
         const {
@@ -18,18 +15,15 @@ exports.getProducts = async (req, res) => {
             limit = 20,
         } = req.query;
 
-        // Build query
         const query = {
             supplier: req.user.id,
             isActive: true,
         };
 
-        // Filter by category
         if (category && category !== 'All') {
             query.category = category;
         }
 
-        // Price range filter
         if (minPrice || maxPrice) {
             query.price = {};
             if (minPrice) {
@@ -40,20 +34,17 @@ exports.getProducts = async (req, res) => {
             }
         }
 
-        // Stock status filter
         if (stockStatus) {
             const statuses = stockStatus.split(',').map((s) => s.trim());
             const stockConditions = [];
 
             if (statuses.includes('inStock')) {
-                // In Stock: stock > lowStockThreshold
                 stockConditions.push({
                     $expr: { $gt: ['$stock', '$lowStockThreshold'] },
                 });
             }
 
             if (statuses.includes('lowStock')) {
-                // Low Stock: stock > 0 AND stock <= lowStockThreshold
                 stockConditions.push({
                     $and: [
                         { stock: { $gt: 0 } },
@@ -63,7 +54,6 @@ exports.getProducts = async (req, res) => {
             }
 
             if (statuses.includes('outOfStock')) {
-                // Out of Stock: stock === 0
                 stockConditions.push({ stock: 0 });
             }
 
@@ -72,12 +62,10 @@ exports.getProducts = async (req, res) => {
             }
         }
 
-        // Search functionality
         if (search) {
             query.$text = { $search: search };
         }
 
-        // Build sort object
         let sortObject = {};
         switch (sortBy) {
             case 'newest':
@@ -96,15 +84,11 @@ exports.getProducts = async (req, res) => {
                 sortObject = { createdAt: -1 };
         }
 
-        // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        // Execute query
         let products;
         let total;
 
         if (search) {
-            // Text search with score
             products = await Product.find(query, { score: { $meta: 'textScore' } })
                 .sort(sortBy === 'newest' && search
                     ? { score: { $meta: 'textScore' }, createdAt: -1 }
@@ -114,7 +98,6 @@ exports.getProducts = async (req, res) => {
                 .skip(skip)
                 .limit(parseInt(limit));
 
-            // For text search, we need to count differently
             total = await Product.countDocuments(query);
         } else {
             products = await Product.find(query)
@@ -125,7 +108,6 @@ exports.getProducts = async (req, res) => {
             total = await Product.countDocuments(query);
         }
 
-        // Add stock status to each product for frontend convenience
         const productsWithStatus = products.map((product) => {
             const productObj = product.toObject();
             if (product.stock === 0) {
@@ -155,9 +137,6 @@ exports.getProducts = async (req, res) => {
     }
 };
 
-// @desc    Get single product
-// @route   GET /api/products/:id
-// @access  Private
 exports.getProduct = async (req, res) => {
     try {
         const product = await Product.findOne({
@@ -234,9 +213,6 @@ exports.createProduct = async (req, res) => {
     }
 };
 
-// @desc    Update product
-// @route   PUT /api/products/:id
-// @access  Private
 exports.updateProduct = async (req, res) => {
     try {
         const { name, category, description, price, stock, lowStockThreshold, isActive, discount, unit, specifications, deliveryOptions } = req.body;
@@ -283,9 +259,6 @@ exports.updateProduct = async (req, res) => {
     }
 };
 
-// @desc    Delete product
-// @route   DELETE /api/products/:id
-// @access  Private
 exports.deleteProduct = async (req, res) => {
     try {
         const product = await Product.findOne({
@@ -364,9 +337,6 @@ exports.deleteProduct = async (req, res) => {
     }
 };
 
-// @desc    Upload product image
-// @route   POST /api/products/:id/upload-image
-// @access  Private
 exports.uploadProductImage = async (req, res) => {
     try {
         if (!req.file) {
@@ -466,9 +436,6 @@ exports.uploadProductImage = async (req, res) => {
     }
 };
 
-// @desc    Upload multiple product images (up to 6)
-// @route   POST /api/products/:id/upload-images
-// @access  Private
 exports.uploadProductImages = async (req, res) => {
     try {
         console.log(`📤 Uploading images for product: ${req.params.id}`);
@@ -583,9 +550,6 @@ exports.uploadProductImages = async (req, res) => {
     }
 };
 
-// @desc    Delete product image
-// @route   DELETE /api/products/:id/images/:imageIndex
-// @access  Private
 exports.deleteProductImage = async (req, res) => {
     try {
         const product = await Product.findOne({
@@ -693,9 +657,6 @@ exports.deleteProductImage = async (req, res) => {
     }
 };
 
-// @desc    Get product categories
-// @route   GET /api/products/categories
-// @access  Private
 exports.getCategories = async (req, res) => {
     try {
         const categories = await Product.distinct('category', {

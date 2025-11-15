@@ -2,35 +2,25 @@ const Campaign = require('../models/Campaign');
 const Product = require('../models/Product');
 const Notification = require('../models/Notification');
 
-// @desc    Get all campaigns
-// @route   GET /api/campaigns
-// @access  Private
 exports.getCampaigns = async (req, res) => {
     try {
         const { status, page = 1, limit = 20 } = req.query;
 
-        // Build query
         const query = { supplier: req.user.id };
 
-        // Filter by status
         if (status && status !== 'All') {
             query.status = status;
         }
 
-        // Pagination
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        // Execute query
         const campaigns = await Campaign.find(query)
             .populate('products', 'name image price')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
 
-        // Get total count
         const total = await Campaign.countDocuments(query);
-
-        // Get summary stats
         const activeCampaigns = await Campaign.countDocuments({
             supplier: req.user.id,
             status: 'Active',
@@ -57,14 +47,11 @@ exports.getCampaigns = async (req, res) => {
         console.error('❌ Get campaigns error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching campaigns',
+            message: 'Failed to fetch campaigns',
         });
     }
 };
 
-// @desc    Get single campaign
-// @route   GET /api/campaigns/:id
-// @access  Private
 exports.getCampaign = async (req, res) => {
     try {
         const campaign = await Campaign.findOne({
@@ -87,19 +74,15 @@ exports.getCampaign = async (req, res) => {
         console.error('❌ Get campaign error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching campaign',
+            message: 'Failed to fetch campaign',
         });
     }
 };
 
-// @desc    Create new campaign
-// @route   POST /api/campaigns
-// @access  Private
 exports.createCampaign = async (req, res) => {
     try {
         const { name, products, dailyBudget, startDate, endDate } = req.body;
 
-        // Validation
         if (!name || !products || !Array.isArray(products) || products.length === 0) {
             return res.status(400).json({
                 success: false,
@@ -114,7 +97,6 @@ exports.createCampaign = async (req, res) => {
             });
         }
 
-        // Verify products belong to supplier
         const productIds = products.map((p) => p.productId || p);
         const validProducts = await Product.find({
             _id: { $in: productIds },
@@ -129,7 +111,6 @@ exports.createCampaign = async (req, res) => {
             });
         }
 
-        // Create campaign
         const campaign = await Campaign.create({
             name,
             supplier: req.user.id,
@@ -152,14 +133,11 @@ exports.createCampaign = async (req, res) => {
         console.error('❌ Create campaign error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while creating campaign',
+            message: 'Failed to create campaign',
         });
     }
 };
 
-// @desc    Update campaign
-// @route   PUT /api/campaigns/:id
-// @access  Private
 exports.updateCampaign = async (req, res) => {
     try {
         const { name, products, dailyBudget, status, startDate, endDate } = req.body;
@@ -177,14 +155,12 @@ exports.updateCampaign = async (req, res) => {
             });
         }
 
-        // Update fields
         if (name) campaign.name = name;
         if (dailyBudget !== undefined) campaign.dailyBudget = parseFloat(dailyBudget);
         if (status) campaign.status = status;
         if (startDate) campaign.startDate = new Date(startDate);
         if (endDate !== undefined) campaign.endDate = endDate ? new Date(endDate) : null;
 
-        // Update products if provided
         if (products && Array.isArray(products)) {
             const productIds = products.map((p) => p.productId || p);
             const validProducts = await Product.find({
@@ -217,14 +193,11 @@ exports.updateCampaign = async (req, res) => {
         console.error('❌ Update campaign error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while updating campaign',
+            message: 'Failed to update campaign',
         });
     }
 };
 
-// @desc    Get campaign stats
-// @route   GET /api/campaigns/:id/stats
-// @access  Private
 exports.getCampaignStats = async (req, res) => {
     try {
         const campaign = await Campaign.findOne({
@@ -263,14 +236,11 @@ exports.getCampaignStats = async (req, res) => {
         console.error('❌ Get campaign stats error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching campaign stats',
+            message: 'Failed to fetch campaign stats',
         });
     }
 };
 
-// @desc    Get campaign insights (detailed)
-// @route   GET /api/campaigns/:id/insights
-// @access  Private
 exports.getCampaignInsights = async (req, res) => {
     try {
         const campaign = await Campaign.findOne({
@@ -285,7 +255,6 @@ exports.getCampaignInsights = async (req, res) => {
             });
         }
 
-        // Calculate metrics
         const ctr = campaign.impressions > 0
             ? ((campaign.clicks / campaign.impressions) * 100).toFixed(2)
             : 0;
@@ -294,7 +263,6 @@ exports.getCampaignInsights = async (req, res) => {
             ? (campaign.totalBudgetSpent / campaign.clicks).toFixed(2)
             : 0;
 
-        // Get daily performance (last 7 days)
         const now = new Date();
         const dailyPerformance = [];
         for (let i = 6; i >= 0; i--) {
@@ -304,8 +272,6 @@ exports.getCampaignInsights = async (req, res) => {
             const nextDate = new Date(date);
             nextDate.setDate(nextDate.getDate() + 1);
 
-            // For demo purposes, we'll generate sample data
-            // In production, you'd track daily metrics separately
             const dayImpressions = Math.floor(Math.random() * 200) + 300;
             const dayClicks = Math.floor(dayImpressions * (parseFloat(ctr) / 100));
 
@@ -318,9 +284,7 @@ exports.getCampaignInsights = async (req, res) => {
             });
         }
 
-        // Product performance
         const productPerformance = campaign.products.map((product) => {
-            // Calculate sales increase (mock data for demo)
             const salesIncrease = Math.floor(Math.random() * 30) + 10;
             const productImpressions = Math.floor(campaign.impressions / campaign.products.length);
             const productClicks = Math.floor(campaign.clicks / campaign.products.length);
@@ -343,7 +307,6 @@ exports.getCampaignInsights = async (req, res) => {
             };
         });
 
-        // Generate recommendations
         const recommendations = [];
         if (parseFloat(ctr) > 5) {
             recommendations.push({
@@ -393,14 +356,11 @@ exports.getCampaignInsights = async (req, res) => {
         console.error('❌ Get campaign insights error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while fetching campaign insights',
+            message: 'Failed to fetch campaign insights',
         });
     }
 };
 
-// @desc    Update campaign metrics (impressions, clicks)
-// @route   PUT /api/campaigns/:id/metrics
-// @access  Private
 exports.updateCampaignMetrics = async (req, res) => {
     try {
         const { impressions, clicks } = req.body;
@@ -423,7 +383,6 @@ exports.updateCampaignMetrics = async (req, res) => {
 
         if (clicks !== undefined) {
             campaign.clicks += parseInt(clicks);
-            // Calculate cost (assuming $0.25 per click for example)
             const costPerClick = 0.25;
             campaign.totalBudgetSpent += parseFloat(clicks) * costPerClick;
         }
@@ -439,14 +398,11 @@ exports.updateCampaignMetrics = async (req, res) => {
         console.error('❌ Update campaign metrics error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while updating campaign metrics',
+            message: 'Failed to update campaign metrics',
         });
     }
 };
 
-// @desc    Delete campaign
-// @route   DELETE /api/campaigns/:id
-// @access  Private
 exports.deleteCampaign = async (req, res) => {
     try {
         const campaign = await Campaign.findOne({
@@ -471,7 +427,7 @@ exports.deleteCampaign = async (req, res) => {
         console.error('❌ Delete campaign error:', error.message);
         res.status(500).json({
             success: false,
-            message: 'Failed to while deleting campaign',
+            message: 'Failed to delete campaign',
         });
     }
 };
