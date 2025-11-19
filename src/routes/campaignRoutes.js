@@ -10,10 +10,14 @@ const {
     getCampaignInsights,
     updateCampaignMetrics,
     deleteCampaign,
+    getTopRankingProducts,
+    boostRanking,
 } = require('../controllers/campaignController');
 
 router.use(protect);
 
+router.get('/top-ranking', getTopRankingProducts);
+router.post('/boost-ranking', boostRanking);
 router.get('/:id/stats', getCampaignStats);
 router.get('/:id/insights', getCampaignInsights);
 router.get('/:id', getCampaign);

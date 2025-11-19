@@ -3,6 +3,117 @@ const Order = require('../models/Order');
 const Product = require('../models/Product');
 const { createNotification } = require('../controllers/notificationController');
 
+// Helper function to format time ago (e.g., "30 min ago", "2 hours ago")
+const formatTimeAgo = (date) => {
+    const now = new Date();
+    const diffMs = now - new Date(date);
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) {
+        return 'Just now';
+    } else if (diffMins < 60) {
+        return `${diffMins} min ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else {
+        return new Date(date).toLocaleDateString();
+    }
+};
+
+// Helper function to shorten customer name (e.g., "John Doe" -> "John D.")
+const shortenCustomerName = (fullName) => {
+    if (!fullName) return '';
+    const parts = fullName.trim().split(' ');
+    if (parts.length === 1) return parts[0];
+    return `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.`;
+};
+
+// Helper function to generate customer initials from name
+const getCustomerInitials = (name) => {
+    if (!name) return 'AN';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) {
+        return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+// Helper function to format date for order history (e.g., "March 15, 2025 • 10:30 AM")
+const formatOrderHistoryDate = (date) => {
+    const orderDate = new Date(date);
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const month = months[orderDate.getMonth()];
+    const day = orderDate.getDate();
+    const year = orderDate.getFullYear();
+    
+    const hours = orderDate.getHours();
+    const minutes = orderDate.getMinutes();
+    const ampm = hours >= 12 ? 'AM' : 'PM';
+    const displayHours = hours % 12 || 12;
+    const displayMinutes = minutes.toString().padStart(2, '0');
+    
+    return `${month} ${day}, ${year} • ${displayHours}:${displayMinutes} ${ampm}`;
+};
+
+// Helper function to format order history entry
+const formatOrderHistoryEntry = (entry) => {
+    return {
+        status: entry.status,
+        statusLabel: entry.status.replace(/([A-Z])/g, ' $1').trim(), // "Order Received" format
+        note: entry.note || '',
+        updatedBy: entry.updatedBy || 'System',
+        timestamp: entry.timestamp,
+        formattedDate: formatOrderHistoryDate(entry.timestamp),
+    };
+};
+
+// Helper function to format order for UI display
+const formatOrderForUI = (order) => {
+    const orderObj = order.toObject ? order.toObject() : order;
+    
+    return {
+        id: orderObj._id || orderObj.id,
+        orderNumber: orderObj.orderNumber,
+        customerName: orderObj.customerName || '',
+        customerNameShort: shortenCustomerName(orderObj.customerName),
+        customerEmail: orderObj.customerEmail || '',
+        customerPhone: orderObj.customerPhone || '',
+        status: orderObj.status,
+        totalAmount: orderObj.totalAmount,
+        itemsCount: orderObj.items ? orderObj.items.length : 0,
+        timeAgo: formatTimeAgo(orderObj.createdAt),
+        createdAt: orderObj.createdAt,
+        items: (orderObj.items || []).map((item) => ({
+            id: item._id || item.id,
+            productId: item.product?._id || item.product || item.productId,
+            productName: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
+            productImage: item.product?.image || null,
+        })),
+        deliveryMethod: orderObj.deliveryMethod,
+        deliveryAddress: orderObj.deliveryAddress,
+        deliveryAddressName: orderObj.deliveryAddress?.name || '',
+        deliveryAddressFull: orderObj.deliveryAddress?.fullAddress || 
+            (orderObj.deliveryAddress?.street && orderObj.deliveryAddress?.city 
+                ? `${orderObj.deliveryAddress.street}, ${orderObj.deliveryAddress.city}, ${orderObj.deliveryAddress.state} ${orderObj.deliveryAddress.zipCode}`
+                : orderObj.deliveryAddress || ''),
+        deliveryTime: orderObj.deliveryTime,
+        paymentMethod: orderObj.paymentMethod,
+        paymentMethodDisplay: orderObj.paymentMethod?.type && orderObj.paymentMethod?.last4
+            ? `${orderObj.paymentMethod.type} •••• ${orderObj.paymentMethod.last4}`
+            : orderObj.paymentMethod?.type || '',
+        customerType: orderObj.customerType,
+        customerInitials: getCustomerInitials(orderObj.customerName),
+        notes: orderObj.notes || '',
+    };
+};
+
 // @desc    Get all orders
 // @route   GET /api/orders
 // @access  Private
@@ -51,14 +162,17 @@ exports.getOrders = async (req, res) => {
             statusMap[item._id] = item.count;
         });
 
+        // Format orders for UI display
+        const formattedOrders = orders.map(formatOrderForUI);
+
         res.status(200).json({
             success: true,
-            count: orders.length,
+            count: formattedOrders.length,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / parseInt(limit)),
             statusCounts: statusMap,
-            orders,
+            orders: formattedOrders,
         });
     } catch (error) {
         console.error('❌ Get orders error:', error.message);
@@ -81,10 +195,13 @@ exports.getRecentOrders = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(limit);
 
+        // Format orders for UI display
+        const formattedOrders = orders.map(formatOrderForUI);
+
         res.status(200).json({
             success: true,
-            count: orders.length,
-            orders,
+            count: formattedOrders.length,
+            orders: formattedOrders,
         });
     } catch (error) {
         console.error('❌ Get recent orders error:', error.message);
@@ -112,14 +229,27 @@ exports.getOrder = async (req, res) => {
             });
         }
 
-        // Sort order history by timestamp (newest first)
-        if (order.orderHistory) {
-            order.orderHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        // Format order for UI display
+        const formattedOrder = formatOrderForUI(order);
+        
+        // Format order history
+        let formattedHistory = [];
+        if (order.orderHistory && order.orderHistory.length > 0) {
+            formattedHistory = order.orderHistory
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .map(formatOrderHistoryEntry);
+        }
+        formattedOrder.orderHistory = formattedHistory;
+        
+        // Add last updated info
+        if (formattedHistory.length > 0) {
+            formattedOrder.lastUpdated = formattedHistory[0].formattedDate;
+            formattedOrder.lastUpdatedStatus = formattedHistory[0].status;
         }
 
         res.status(200).json({
             success: true,
-            order,
+            order: formattedOrder,
         });
     } catch (error) {
         console.error('❌ Get order error:', error.message);
@@ -200,6 +330,31 @@ exports.createOrder = async (req, res) => {
             });
         }
 
+        // Process delivery address (support both old string format and new object format)
+        let processedDeliveryAddress = null;
+        if (deliveryAddress) {
+            if (typeof deliveryAddress === 'string') {
+                // Backward compatibility: if string, store as fullAddress
+                processedDeliveryAddress = {
+                    fullAddress: deliveryAddress,
+                };
+            } else if (typeof deliveryAddress === 'object') {
+                // New format: structured address
+                processedDeliveryAddress = {
+                    name: deliveryAddress.name || '',
+                    street: deliveryAddress.street || '',
+                    city: deliveryAddress.city || '',
+                    state: deliveryAddress.state || '',
+                    zipCode: deliveryAddress.zipCode || '',
+                    country: deliveryAddress.country || '',
+                    fullAddress: deliveryAddress.fullAddress || 
+                        (deliveryAddress.street && deliveryAddress.city
+                            ? `${deliveryAddress.street}, ${deliveryAddress.city}, ${deliveryAddress.state} ${deliveryAddress.zipCode}`
+                            : deliveryAddress.fullAddress || ''),
+                };
+            }
+        }
+
         // Create order
         const order = await Order.create({
             supplier: req.user.id,
@@ -209,7 +364,7 @@ exports.createOrder = async (req, res) => {
             customerEmail: customerEmail || '',
             customerPhone: customerPhone || '',
             customerType: customerType || 'Other',
-            deliveryAddress: deliveryAddress || '',
+            deliveryAddress: processedDeliveryAddress,
             deliveryMethod: deliveryMethod || 'Standard Delivery',
             deliveryTime: deliveryTime || '',
             paymentMethod: paymentMethod || null,
@@ -217,7 +372,9 @@ exports.createOrder = async (req, res) => {
             status: 'New Order',
             orderHistory: [{
                 status: 'New Order',
-                note: 'Order created',
+                note: customerName 
+                    ? `New order received from ${customerName} with ${orderItems.length} items totaling $${totalAmount.toFixed(2)}.`
+                    : 'Order was created in the system.',
                 updatedBy: 'System',
                 timestamp: new Date(),
             }],
@@ -372,9 +529,23 @@ exports.updateOrderStatus = async (req, res) => {
         if (!order.orderHistory) {
             order.orderHistory = [];
         }
+        
+        // Generate descriptive note if not provided
+        let historyNote = note;
+        if (!historyNote) {
+            const statusLabels = {
+                'Processing': 'Processing Order',
+                'Ready for pickup': 'Ready for Pickup',
+                'Out for delivery': 'Out for Delivery',
+                'Completed': 'Completed',
+                'Delivered': 'Order Delivered',
+            };
+            historyNote = `Status updated to ${statusLabels[status] || status}`;
+        }
+        
         order.orderHistory.push({
             status: status,
-            note: note || `Status changed from ${oldStatus} to ${status}`,
+            note: historyNote,
             updatedBy: req.user.name || 'Supplier',
             timestamp: new Date(),
         });
@@ -396,11 +567,30 @@ exports.updateOrderStatus = async (req, res) => {
         }
 
         const populatedOrder = await Order.findById(order._id).populate('items.product', 'name image');
+        
+        // Format order for response
+        const formattedOrder = formatOrderForUI(populatedOrder);
+        
+        // Format order history
+        let formattedHistory = [];
+        if (populatedOrder.orderHistory && populatedOrder.orderHistory.length > 0) {
+            formattedHistory = populatedOrder.orderHistory
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .map(formatOrderHistoryEntry);
+        }
+        formattedOrder.orderHistory = formattedHistory;
+        
+        if (formattedHistory.length > 0) {
+            formattedOrder.lastUpdated = formattedHistory[0].formattedDate;
+            formattedOrder.lastUpdatedStatus = formattedHistory[0].status;
+        }
+
+        console.log(`✅ Order status updated: ${order.orderNumber} -> ${status}`);
 
         res.status(200).json({
             success: true,
             message: 'Order status updated successfully',
-            order: populatedOrder,
+            order: formattedOrder,
         });
     } catch (error) {
         console.error('❌ Update order status error:', error.message);
@@ -416,7 +606,7 @@ exports.updateOrderStatus = async (req, res) => {
 // @access  Private
 exports.updateOrder = async (req, res) => {
     try {
-        const { customerName, customerEmail, customerPhone, deliveryAddress, notes } = req.body;
+        const { customerName, customerEmail, customerPhone, deliveryAddress, deliveryTime, paymentMethod, notes } = req.body;
 
         // Find order
         const order = await Order.findOne({
@@ -432,20 +622,66 @@ exports.updateOrder = async (req, res) => {
         }
 
         // Update fields
-        if (customerName !== undefined) order.customerName = customerName;
-        if (customerEmail !== undefined) order.customerEmail = customerEmail;
-        if (customerPhone !== undefined) order.customerPhone = customerPhone;
-        if (deliveryAddress !== undefined) order.deliveryAddress = deliveryAddress;
-        if (notes !== undefined) order.notes = notes;
+        if (customerName !== undefined) order.customerName = customerName.trim();
+        if (customerEmail !== undefined) order.customerEmail = customerEmail.trim();
+        if (customerPhone !== undefined) order.customerPhone = customerPhone.trim();
+        
+        // Handle deliveryAddress (support both string and object format)
+        if (deliveryAddress !== undefined) {
+            if (typeof deliveryAddress === 'string') {
+                // Backward compatibility: if string, store as fullAddress
+                order.deliveryAddress = {
+                    fullAddress: deliveryAddress,
+                };
+            } else if (typeof deliveryAddress === 'object') {
+                // New format: merge with existing address
+                const existingAddress = order.deliveryAddress || {};
+                order.deliveryAddress = {
+                    ...existingAddress,
+                    ...(deliveryAddress.name !== undefined && { name: deliveryAddress.name.trim() }),
+                    ...(deliveryAddress.street !== undefined && { street: deliveryAddress.street.trim() }),
+                    ...(deliveryAddress.city !== undefined && { city: deliveryAddress.city.trim() }),
+                    ...(deliveryAddress.state !== undefined && { state: deliveryAddress.state.trim() }),
+                    ...(deliveryAddress.zipCode !== undefined && { zipCode: deliveryAddress.zipCode.trim() }),
+                    ...(deliveryAddress.country !== undefined && { country: deliveryAddress.country.trim() }),
+                    ...(deliveryAddress.fullAddress !== undefined && { fullAddress: deliveryAddress.fullAddress.trim() }),
+                };
+                // Auto-generate fullAddress if not provided but components are
+                if (!order.deliveryAddress.fullAddress && order.deliveryAddress.street && order.deliveryAddress.city) {
+                    order.deliveryAddress.fullAddress = `${order.deliveryAddress.street}, ${order.deliveryAddress.city}, ${order.deliveryAddress.state} ${order.deliveryAddress.zipCode}`;
+                }
+            }
+        }
+        
+        if (deliveryTime !== undefined) order.deliveryTime = deliveryTime.trim();
+        if (paymentMethod !== undefined) order.paymentMethod = paymentMethod;
+        if (notes !== undefined) order.notes = notes.trim();
 
         await order.save();
 
         const populatedOrder = await Order.findById(order._id).populate('items.product', 'name image');
+        const formattedOrder = formatOrderForUI(populatedOrder);
+        
+        // Format order history
+        let formattedHistory = [];
+        if (populatedOrder.orderHistory && populatedOrder.orderHistory.length > 0) {
+            formattedHistory = populatedOrder.orderHistory
+                .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                .map(formatOrderHistoryEntry);
+        }
+        formattedOrder.orderHistory = formattedHistory;
+        
+        if (formattedHistory.length > 0) {
+            formattedOrder.lastUpdated = formattedHistory[0].formattedDate;
+            formattedOrder.lastUpdatedStatus = formattedHistory[0].status;
+        }
+
+        console.log(`✅ Order updated: ${order.orderNumber} (ID: ${order._id})`);
 
         res.status(200).json({
             success: true,
             message: 'Order updated successfully',
-            order: populatedOrder,
+            order: formattedOrder,
         });
     } catch (error) {
         console.error('❌ Update order error:', error.message);

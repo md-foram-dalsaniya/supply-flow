@@ -1,20 +1,11 @@
-/**
- * DATABASE.JS - Database Connection
- * 
- * This file connects our app to MongoDB database.
- * MongoDB stores all our data (users, products, orders, etc.)
- */
-
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    // Get database URL from environment variables, or use default
     const dbUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/supply_app';
 
-    console.log('   📍 Connecting to:', dbUrl.replace(/\/\/.*@/, '//***@')); // Hide password in logs
+    console.log('   📍 Connecting to:', dbUrl.replace(/\/\/.*@/, '//***@'));
 
-    // Connect to MongoDB
     const conn = await mongoose.connect(dbUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -30,9 +21,8 @@ const connectDB = async () => {
     console.error('   💡 Check your MONGODB_URI in .env file');
     console.error(`   📝 Error: ${error.message}`);
     console.error('');
-    process.exit(1); // Stop server if database connection fails
+    process.exit(1);
   }
 };
 
 module.exports = connectDB;
-

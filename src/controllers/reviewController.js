@@ -3,6 +3,68 @@ const StoreSettings = require('../models/StoreSettings');
 const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
 
+// Helper function to format time ago (e.g., "2 days ago", "1 week ago")
+const formatTimeAgo = (date) => {
+    const now = new Date();
+    const diffMs = now - new Date(date);
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffMins < 1) {
+        return 'Just now';
+    } else if (diffMins < 60) {
+        return `${diffMins} min ago`;
+    } else if (diffHours < 24) {
+        return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffDays < 7) {
+        return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffWeeks < 4) {
+        return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
+    } else if (diffMonths < 12) {
+        return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+    } else {
+        return new Date(date).toLocaleDateString();
+    }
+};
+
+// Helper function to generate customer initials from name
+const getCustomerInitials = (name) => {
+    if (!name) return 'AN';
+    const parts = name.trim().split(' ');
+    if (parts.length === 1) {
+        return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+// Helper function to format review for UI display
+const formatReviewForUI = (review) => {
+    const reviewObj = review.toObject ? review.toObject() : review;
+    
+    return {
+        id: reviewObj._id || reviewObj.id,
+        customerName: reviewObj.customerName || '',
+        customerInitials: getCustomerInitials(reviewObj.customerName),
+        customerEmail: reviewObj.customerEmail || '',
+        rating: reviewObj.rating,
+        reviewText: reviewObj.reviewText || '',
+        images: reviewObj.images || [],
+        imagesCount: reviewObj.images ? reviewObj.images.length : 0,
+        timeAgo: formatTimeAgo(reviewObj.createdAt),
+        createdAt: reviewObj.createdAt,
+        reply: reviewObj.reply ? {
+            companyName: reviewObj.reply.companyName,
+            replyText: reviewObj.reply.replyText,
+            timeAgo: formatTimeAgo(reviewObj.reply.createdAt),
+            createdAt: reviewObj.reply.createdAt,
+        } : null,
+        hasReply: !!reviewObj.reply,
+    };
+};
+
 // @desc    Get all reviews
 // @route   GET /api/reviews
 // @access  Private
@@ -75,14 +137,17 @@ exports.getReviews = async (req, res) => {
                 : 0;
         });
 
+        // Format reviews for UI display
+        const formattedReviews = reviews.map(formatReviewForUI);
+
         res.status(200).json({
             success: true,
-            count: reviews.length,
+            count: formattedReviews.length,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / parseInt(limit)),
             ratingDistribution: distribution,
-            reviews,
+            reviews: formattedReviews,
         });
     } catch (error) {
         console.error('❌ Get reviews error:', error.message);
@@ -129,15 +194,22 @@ exports.getReviewSummary = async (req, res) => {
         // Convert to percentages
         const ratingDistribution = {};
         Object.keys(distribution).forEach((rating) => {
-            ratingDistribution[rating] = Math.round((distribution[rating] / totalReviews) * 100);
+            ratingDistribution[rating] = totalReviews > 0
+                ? Math.round((distribution[rating] / totalReviews) * 100)
+                : 0;
         });
+
+        // Calculate top percentage (e.g., "Top 5%")
+        // This is a simplified calculation - in real app, you'd compare with industry averages
+        const topPercentage = averageRating >= 4.8 ? 5 : averageRating >= 4.5 ? 10 : averageRating >= 4.0 ? 25 : averageRating >= 3.5 ? 50 : null;
 
         res.status(200).json({
             success: true,
             summary: {
-                averageRating: averageRating.toFixed(1),
+                averageRating: parseFloat(averageRating.toFixed(1)),
                 totalReviews,
                 ratingDistribution,
+                topPercentage: topPercentage ? `Top ${topPercentage}%` : null,
             },
         });
     } catch (error) {
@@ -201,7 +273,7 @@ exports.createReview = async (req, res) => {
         // Filter only image files (in case other files are uploaded)
         let imageUrls = [];
         const imageFiles = req.files ? req.files.filter(file => {
-            const allowedTypes = /jpeg|jpg|png|gif|webp/;
+            const allowedTypes = /jpeg|jpg|png|gif|webp|svg/;
             return allowedTypes.test(file.mimetype);
         }) : [];
 

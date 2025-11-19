@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const upload = require('../middleware/upload');
+const { upload, handleMulterError } = require('../middleware/upload');
 const {
   getProducts,
   getProduct,
@@ -17,8 +17,8 @@ const {
 router.use(protect);
 
 router.get('/categories', getCategories);
-router.post('/:id/upload-image', upload.single('image'), uploadProductImage);
-router.post('/:id/upload-images', upload.array('images', 6), uploadProductImages);
+router.post('/:id/upload-image', upload.single('image'), handleMulterError, uploadProductImage);
+router.post('/:id/upload-images', upload.array('images', 6), handleMulterError, uploadProductImages);
 router.delete('/:id/images/:imageIndex', deleteProductImage);
 
 router.get('/', getProducts);

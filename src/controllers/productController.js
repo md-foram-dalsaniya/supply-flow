@@ -151,9 +151,19 @@ exports.getProduct = async (req, res) => {
             });
         }
 
+        // Add stock status indicator
+        const productObj = product.toObject();
+        if (product.stock === 0) {
+            productObj.stockStatus = 'outOfStock';
+        } else if (product.stock <= product.lowStockThreshold) {
+            productObj.stockStatus = 'lowStock';
+        } else {
+            productObj.stockStatus = 'inStock';
+        }
+
         res.status(200).json({
             success: true,
-            product,
+            product: productObj,
         });
     } catch (error) {
         console.error('❌ Get product error:', error.message);
@@ -171,24 +181,98 @@ exports.createProduct = async (req, res) => {
     try {
         const { name, category, description, price, stock, lowStockThreshold, discount, unit, specifications, deliveryOptions } = req.body;
 
-        // Validation
-        if (!name || !category || !price || stock === undefined) {
+        // Validation - Required fields (marked with * in form)
+        if (!name || !name.trim()) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide name, category, price, and stock',
+                message: 'Please provide product name (Full Name is required)',
+            });
+        }
+
+        if (!category || !category.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide product category (Category is required)',
+            });
+        }
+
+        // Validate category enum
+        const validCategories = ['Building Materials', 'Tools', 'Electrical', 'Plumbing', 'Hardware', 'Other'];
+        if (!validCategories.includes(category)) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid category. Must be one of: ${validCategories.join(', ')}`,
+            });
+        }
+
+        if (price === undefined || price === null || price === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide product price (Price is required)',
+            });
+        }
+
+        const priceNum = parseFloat(price);
+        if (isNaN(priceNum) || priceNum < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Price must be a valid number greater than or equal to 0',
+            });
+        }
+
+        if (stock === undefined || stock === null || stock === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide stock quantity (Stock Quantity is required)',
+            });
+        }
+
+        const stockNum = parseInt(stock);
+        if (isNaN(stockNum) || stockNum < 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Stock quantity must be a valid number greater than or equal to 0',
+            });
+        }
+
+        // Validate discount (0-100)
+        let discountNum = 0;
+        if (discount !== undefined && discount !== null && discount !== '') {
+            discountNum = parseFloat(discount);
+            if (isNaN(discountNum) || discountNum < 0 || discountNum > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Discount must be a number between 0 and 100',
+                });
+            }
+        }
+
+        // Validate specifications format
+        if (specifications && !Array.isArray(specifications)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Specifications must be an array of objects with name and value',
+            });
+        }
+
+        // Validate delivery options format
+        if (deliveryOptions && typeof deliveryOptions !== 'object') {
+            return res.status(400).json({
+                success: false,
+                message: 'Delivery options must be an object',
             });
         }
 
         // Create product
         const product = await Product.create({
-            name,
+            name: name.trim(),
             category,
-            description: description || '',
-            price: parseFloat(price),
-            stock: parseInt(stock),
+            description: description ? description.trim() : '',
+            price: priceNum,
+            stock: stockNum,
             lowStockThreshold: lowStockThreshold ? parseInt(lowStockThreshold) : 10,
-            discount: discount ? parseFloat(discount) : 0,
-            unit: unit || 'Unit',
+            discount: discountNum,
+            unit: unit ? unit.trim() : 'Unit',
             specifications: specifications || [],
             deliveryOptions: deliveryOptions || {
                 availableForDelivery: true,
@@ -199,6 +283,8 @@ exports.createProduct = async (req, res) => {
             supplier: req.user.id,
         });
 
+        console.log(`✅ Product created: ${product.name} (ID: ${product._id})`);
+
         res.status(201).json({
             success: true,
             message: 'Product created successfully',
@@ -206,6 +292,16 @@ exports.createProduct = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Create product error:', error.message);
+
+        // Handle validation errors from Mongoose
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map((val) => val.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(', '),
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: 'Failed to create product. Please check your information and try again.',
@@ -230,20 +326,112 @@ exports.updateProduct = async (req, res) => {
             });
         }
 
-        // Update fields
-        if (name) product.name = name;
-        if (category) product.category = category;
-        if (description !== undefined) product.description = description;
-        if (price !== undefined) product.price = parseFloat(price);
-        if (stock !== undefined) product.stock = parseInt(stock);
-        if (lowStockThreshold !== undefined) product.lowStockThreshold = parseInt(lowStockThreshold);
-        if (isActive !== undefined) product.isActive = isActive;
-        if (discount !== undefined) product.discount = parseFloat(discount);
-        if (unit !== undefined) product.unit = unit;
-        if (specifications !== undefined) product.specifications = specifications;
-        if (deliveryOptions !== undefined) product.deliveryOptions = deliveryOptions;
+        // Update fields with validation
+        if (name !== undefined) {
+            if (!name || !name.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Product name (Full Name) is required and cannot be empty',
+                });
+            }
+            product.name = name.trim();
+        }
+
+        if (category !== undefined) {
+            const validCategories = ['Building Materials', 'Tools', 'Electrical', 'Plumbing', 'Hardware', 'Other'];
+            if (!validCategories.includes(category)) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid category. Must be one of: ${validCategories.join(', ')}`,
+                });
+            }
+            product.category = category;
+        }
+
+        if (description !== undefined) {
+            product.description = description ? description.trim() : '';
+        }
+
+        if (price !== undefined) {
+            const priceNum = parseFloat(price);
+            if (isNaN(priceNum) || priceNum < 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Price must be a valid number greater than or equal to 0',
+                });
+            }
+            product.price = priceNum;
+        }
+
+        if (stock !== undefined) {
+            const stockNum = parseInt(stock);
+            if (isNaN(stockNum) || stockNum < 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Stock quantity must be a valid number greater than or equal to 0',
+                });
+            }
+            product.stock = stockNum;
+        }
+
+        if (lowStockThreshold !== undefined) {
+            product.lowStockThreshold = parseInt(lowStockThreshold);
+        }
+
+        if (isActive !== undefined) {
+            // Handle both boolean and string values
+            if (typeof isActive === 'string') {
+                product.isActive = isActive.toLowerCase() === 'true' || isActive === '1';
+            } else {
+                product.isActive = Boolean(isActive);
+            }
+        }
+
+        if (discount !== undefined) {
+            const discountNum = parseFloat(discount);
+            if (isNaN(discountNum) || discountNum < 0 || discountNum > 100) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Discount must be a number between 0 and 100',
+                });
+            }
+            product.discount = discountNum;
+        }
+
+        if (unit !== undefined) {
+            product.unit = unit ? unit.trim() : 'Unit';
+        }
+
+        if (specifications !== undefined) {
+            if (!Array.isArray(specifications)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Specifications must be an array of objects with name and value',
+                });
+            }
+            product.specifications = specifications;
+        }
+
+        if (deliveryOptions !== undefined) {
+            if (typeof deliveryOptions !== 'object' || Array.isArray(deliveryOptions)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Delivery options must be an object',
+                });
+            }
+            product.deliveryOptions = {
+                availableForDelivery: deliveryOptions.availableForDelivery !== undefined
+                    ? Boolean(deliveryOptions.availableForDelivery)
+                    : product.deliveryOptions?.availableForDelivery ?? true,
+                availableForPickup: deliveryOptions.availableForPickup !== undefined
+                    ? Boolean(deliveryOptions.availableForPickup)
+                    : product.deliveryOptions?.availableForPickup ?? true,
+            };
+        }
 
         await product.save();
+
+        console.log(`✅ Product updated: ${product.name} (ID: ${product._id})`);
 
         res.status(200).json({
             success: true,
@@ -252,6 +440,16 @@ exports.updateProduct = async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Update product error:', error.message);
+
+        // Handle validation errors from Mongoose
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map((val) => val.message);
+            return res.status(400).json({
+                success: false,
+                message: messages.join(', '),
+            });
+        }
+
         res.status(500).json({
             success: false,
             message: 'Failed to update product. Please check your information and try again.',

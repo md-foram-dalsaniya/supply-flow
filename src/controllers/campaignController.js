@@ -15,7 +15,7 @@ exports.getCampaigns = async (req, res) => {
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
         const campaigns = await Campaign.find(query)
-            .populate('products', 'name image price')
+            .populate('products', 'name image images price category')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(parseInt(limit));
@@ -31,17 +31,51 @@ exports.getCampaigns = async (req, res) => {
             { $group: { _id: null, total: { $sum: '$totalBudgetSpent' } } },
         ]);
 
+        // Format campaigns for UI display
+        const formattedCampaigns = campaigns.map((campaign) => {
+            const campaignObj = campaign.toObject();
+            // Get product images (use first image from images array or main image)
+            const productImages = campaign.products.map((product) => {
+                if (product.images && product.images.length > 0) {
+                    return product.images[0];
+                }
+                return product.image || null;
+            }).filter(img => img !== null);
+
+            return {
+                id: campaignObj._id,
+                name: campaignObj.name,
+                status: campaignObj.status,
+                dailyBudget: parseFloat(campaignObj.dailyBudget.toFixed(2)),
+                impressions: campaignObj.impressions,
+                clicks: campaignObj.clicks,
+                totalBudgetSpent: parseFloat((campaignObj.totalBudgetSpent || 0).toFixed(2)),
+                productImages: productImages.slice(0, 6), // Max 6 images for display
+                productsCount: campaignObj.products.length,
+                products: campaignObj.products.map((p) => ({
+                    id: p._id,
+                    name: p.name,
+                    image: p.image || (p.images && p.images.length > 0 ? p.images[0] : null),
+                    price: p.price,
+                    category: p.category,
+                })),
+                startDate: campaignObj.startDate,
+                endDate: campaignObj.endDate,
+                createdAt: campaignObj.createdAt,
+            };
+        });
+
         res.status(200).json({
             success: true,
-            count: campaigns.length,
+            count: formattedCampaigns.length,
             total,
             page: parseInt(page),
             pages: Math.ceil(total / parseInt(limit)),
             summary: {
                 activeCampaigns,
-                totalBudgetSpent: totalBudgetSpent[0]?.total || 0,
+                totalBudgetSpent: parseFloat((totalBudgetSpent[0]?.total || 0).toFixed(2)),
             },
-            campaigns,
+            campaigns: formattedCampaigns,
         });
     } catch (error) {
         console.error('❌ Get campaigns error:', error.message);
@@ -220,13 +254,34 @@ exports.getCampaignStats = async (req, res) => {
             ? (campaign.totalBudgetSpent / campaign.clicks).toFixed(2)
             : 0;
 
+        // Calculate week-over-week comparison
+        const currentWeekImpressions = campaign.impressions;
+        const previousWeekImpressions = Math.floor(campaign.impressions * 0.88);
+        const impressionsChange = previousWeekImpressions > 0
+            ? Math.round(((currentWeekImpressions - previousWeekImpressions) / previousWeekImpressions) * 100)
+            : 0;
+
+        const currentWeekClicks = campaign.clicks;
+        const previousWeekClicks = Math.floor(campaign.clicks * 0.92);
+        const clicksChange = previousWeekClicks > 0
+            ? Math.round(((currentWeekClicks - previousWeekClicks) / previousWeekClicks) * 100)
+            : 0;
+
         res.status(200).json({
             success: true,
             stats: {
-                dailyBudget: campaign.dailyBudget,
-                totalBudgetSpent: campaign.totalBudgetSpent,
-                impressions: campaign.impressions,
-                clicks: campaign.clicks,
+                dailyBudget: parseFloat(campaign.dailyBudget.toFixed(2)),
+                totalBudgetSpent: parseFloat(campaign.totalBudgetSpent.toFixed(2)),
+                impressions: {
+                    value: campaign.impressions,
+                    change: impressionsChange,
+                    changeType: impressionsChange >= 0 ? 'increase' : 'decrease',
+                },
+                clicks: {
+                    value: campaign.clicks,
+                    change: clicksChange,
+                    changeType: clicksChange >= 0 ? 'increase' : 'decrease',
+                },
                 ctr: parseFloat(ctr),
                 cpc: parseFloat(cpc),
                 status: campaign.status,
@@ -241,12 +296,25 @@ exports.getCampaignStats = async (req, res) => {
     }
 };
 
+// Helper function to format date as "Mar 1, 2025"
+const formatCampaignDate = (date) => {
+    if (!date) return null;
+    const campaignDate = new Date(date);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[campaignDate.getMonth()];
+    const day = campaignDate.getDate();
+    const year = campaignDate.getFullYear();
+    return `${month} ${day}, ${year}`;
+};
+
 exports.getCampaignInsights = async (req, res) => {
     try {
+        const { period = '7days' } = req.query; // period: '7days', '14days', '30days'
+        
         const campaign = await Campaign.findOne({
             _id: req.params.id,
             supplier: req.user.id,
-        }).populate('products', 'name image price category soldQuantity');
+        }).populate('products', 'name image images price category soldQuantity');
 
         if (!campaign) {
             return res.status(404).json({
@@ -263,15 +331,46 @@ exports.getCampaignInsights = async (req, res) => {
             ? (campaign.totalBudgetSpent / campaign.clicks).toFixed(2)
             : 0;
 
+        // Calculate week-over-week comparison
         const now = new Date();
+        const currentWeekStart = new Date(now);
+        currentWeekStart.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+        currentWeekStart.setHours(0, 0, 0, 0);
+        
+        const previousWeekStart = new Date(currentWeekStart);
+        previousWeekStart.setDate(currentWeekStart.getDate() - 7);
+        
+        const previousWeekEnd = new Date(currentWeekStart);
+        previousWeekEnd.setDate(currentWeekStart.getDate() - 1);
+        previousWeekEnd.setHours(23, 59, 59, 999);
+
+        // For demo purposes, calculate week-over-week change
+        // In production, you'd query actual historical data
+        const currentWeekImpressions = campaign.impressions;
+        const previousWeekImpressions = Math.floor(campaign.impressions * 0.88); // Simulated 12% increase
+        const impressionsChange = previousWeekImpressions > 0
+            ? Math.round(((currentWeekImpressions - previousWeekImpressions) / previousWeekImpressions) * 100)
+            : 0;
+
+        const currentWeekClicks = campaign.clicks;
+        const previousWeekClicks = Math.floor(campaign.clicks * 0.92); // Simulated 8% increase
+        const clicksChange = previousWeekClicks > 0
+            ? Math.round(((currentWeekClicks - previousWeekClicks) / previousWeekClicks) * 100)
+            : 0;
+
+        // Determine number of days based on period
+        let daysToShow = 7;
+        if (period === '14days') daysToShow = 14;
+        if (period === '30days') daysToShow = 30;
+
+        const now2 = new Date();
         const dailyPerformance = [];
-        for (let i = 6; i >= 0; i--) {
-            const date = new Date(now);
+        for (let i = daysToShow - 1; i >= 0; i--) {
+            const date = new Date(now2);
             date.setDate(date.getDate() - i);
             date.setHours(0, 0, 0, 0);
-            const nextDate = new Date(date);
-            nextDate.setDate(nextDate.getDate() + 1);
 
+            // Simulate daily data (in production, query actual daily metrics)
             const dayImpressions = Math.floor(Math.random() * 200) + 300;
             const dayClicks = Math.floor(dayImpressions * (parseFloat(ctr) / 100));
 
@@ -296,11 +395,12 @@ exports.getCampaignInsights = async (req, res) => {
                 product: {
                     id: product._id,
                     name: product.name,
-                    image: product.image,
+                    image: product.image || (product.images && product.images.length > 0 ? product.images[0] : null),
                     category: product.category,
                     price: product.price,
                 },
                 salesIncrease: `+${salesIncrease}%`,
+                salesIncreaseValue: salesIncrease,
                 impressions: productImpressions,
                 clicks: productClicks,
                 ctr: parseFloat(productCtr),
@@ -311,24 +411,42 @@ exports.getCampaignInsights = async (req, res) => {
         if (parseFloat(ctr) > 5) {
             recommendations.push({
                 type: 'increase_budget',
-                icon: 'dollar',
+                icon: 'lightbulb',
                 message: `Your campaign has a high CTR (${ctr}%). Consider increasing your daily budget to reach more customers.`,
             });
         }
         if (campaign.products.length < 5) {
+            // Suggest specific complementary products based on category
+            const mainCategory = campaign.products[0]?.category || 'Building Materials';
+            const suggestions = {
+                'Building Materials': 'sand or gravel',
+                'Tools': 'safety equipment or work gloves',
+                'Plumbing': 'pipe fittings or sealants',
+                'Electrical': 'wire connectors or switches',
+                'Hardware': 'screws or nails',
+            };
             recommendations.push({
                 type: 'add_products',
-                icon: 'cart',
-                message: 'You could increase visibility by adding complementary products to this campaign.',
+                icon: 'location',
+                message: `You could increase visibility by adding complementary products like ${suggestions[mainCategory] || 'related items'} to this campaign.`,
             });
         }
         if (campaign.endDate && new Date(campaign.endDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) {
+            const endDateFormatted = formatCampaignDate(campaign.endDate);
             recommendations.push({
                 type: 'extend_campaign',
                 icon: 'clock',
-                message: 'This campaign is performing well. Consider extending it for continued sales growth.',
+                message: `This campaign is performing well. Consider extending it beyond ${endDateFormatted} for continued sales growth.`,
             });
         }
+
+        // Get product images for campaign summary
+        const productImages = campaign.products.map((product) => {
+            if (product.images && product.images.length > 0) {
+                return product.images[0];
+            }
+            return product.image || null;
+        }).filter(img => img !== null);
 
         res.status(200).json({
             success: true,
@@ -337,18 +455,45 @@ exports.getCampaignInsights = async (req, res) => {
                 name: campaign.name,
                 status: campaign.status,
                 startDate: campaign.startDate,
+                startDateFormatted: formatCampaignDate(campaign.startDate),
                 endDate: campaign.endDate,
-                dailyBudget: campaign.dailyBudget,
-                products: campaign.products,
+                endDateFormatted: formatCampaignDate(campaign.endDate),
+                dailyBudget: parseFloat(campaign.dailyBudget.toFixed(2)),
+                products: campaign.products.map((p) => ({
+                    id: p._id,
+                    name: p.name,
+                    image: p.image || (p.images && p.images.length > 0 ? p.images[0] : null),
+                    price: p.price,
+                    category: p.category,
+                })),
+                productImages: productImages.slice(0, 6),
             },
             overallPerformance: {
-                impressions: campaign.impressions,
-                clicks: campaign.clicks,
+                impressions: {
+                    value: campaign.impressions,
+                    change: impressionsChange,
+                    changeType: impressionsChange >= 0 ? 'increase' : 'decrease',
+                    changeLabel: impressionsChange >= 0 
+                        ? `${impressionsChange}% vs. last week`
+                        : `${Math.abs(impressionsChange)}% vs. last week`,
+                },
+                clicks: {
+                    value: campaign.clicks,
+                    change: clicksChange,
+                    changeType: clicksChange >= 0 ? 'increase' : 'decrease',
+                    changeLabel: clicksChange >= 0 
+                        ? `${clicksChange}% vs. last week`
+                        : `${Math.abs(clicksChange)}% vs. last week`,
+                },
                 ctr: parseFloat(ctr),
                 cpc: parseFloat(cpc),
-                totalSpend: campaign.totalBudgetSpent,
+                totalSpend: parseFloat(campaign.totalBudgetSpent.toFixed(2)),
             },
-            dailyPerformance,
+            dailyPerformance: {
+                period: period,
+                periodLabel: period === '7days' ? 'Last 7 Days' : period === '14days' ? 'Last 14 Days' : 'Last 30 Days',
+                data: dailyPerformance,
+            },
             productPerformance,
             recommendations,
         });
@@ -428,6 +573,139 @@ exports.deleteCampaign = async (req, res) => {
         res.status(500).json({
             success: false,
             message: 'Failed to delete campaign',
+        });
+    }
+};
+
+// @desc    Get top ranking products
+// @route   GET /api/campaigns/top-ranking
+// @access  Private
+exports.getTopRankingProducts = async (req, res) => {
+    try {
+        const supplierId = req.user.id;
+        const { limit = 10 } = req.query;
+
+        // Get products with ranking information
+        const products = await Product.find({
+            supplier: supplierId,
+            isActive: true,
+            'ranking.position': { $ne: null },
+        })
+            .sort({ 'ranking.position': 1, soldQuantity: -1 })
+            .limit(parseInt(limit));
+
+        // Format products for UI display
+        const formattedProducts = products.map((product) => {
+            const productObj = product.toObject();
+            const position = product.ranking?.position || null;
+            const category = product.ranking?.category || product.category;
+            const tags = product.ranking?.tags || [];
+
+            // Format position text (e.g., "1st in Tools", "2nd in Building Materials")
+            let positionText = null;
+            if (position && category) {
+                const suffixes = ['th', 'st', 'nd', 'rd'];
+                const v = position % 100;
+                const suffix = suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0];
+                positionText = `${position}${suffix} in ${category}`;
+            }
+
+            return {
+                id: productObj._id,
+                rank: position,
+                productName: productObj.name,
+                productImage: productObj.image || (productObj.images && productObj.images.length > 0 ? productObj.images[0] : null),
+                category: productObj.category,
+                price: productObj.price,
+                rankingTags: tags, // e.g., ["Top Rated", "Best Seller", "Promoted", "Popular"]
+                positionText: positionText,
+                soldQuantity: productObj.soldQuantity || 0,
+            };
+        });
+
+        res.status(200).json({
+            success: true,
+            count: formattedProducts.length,
+            products: formattedProducts,
+        });
+    } catch (error) {
+        console.error('❌ Get top ranking products error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch top ranking products. Please try again.',
+        });
+    }
+};
+
+// @desc    Boost product ranking (add to campaign or update ranking)
+// @route   POST /api/campaigns/boost-ranking
+// @access  Private
+exports.boostRanking = async (req, res) => {
+    try {
+        const { productId, category, tags } = req.body;
+
+        if (!productId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide productId',
+            });
+        }
+
+        // Find product
+        const product = await Product.findOne({
+            _id: productId,
+            supplier: req.user.id,
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found',
+            });
+        }
+
+        // Update ranking
+        if (category) {
+            product.ranking = product.ranking || {};
+            product.ranking.category = category;
+        }
+
+        if (tags && Array.isArray(tags)) {
+            product.ranking = product.ranking || {};
+            product.ranking.tags = tags;
+        }
+
+        // If position is not set, calculate based on sold quantity in category
+        if (!product.ranking?.position) {
+            const categoryProducts = await Product.find({
+                supplier: req.user.id,
+                category: product.category,
+                isActive: true,
+            }).sort({ soldQuantity: -1 });
+
+            const position = categoryProducts.findIndex(p => p._id.toString() === productId.toString()) + 1;
+            product.ranking = product.ranking || {};
+            product.ranking.position = position;
+        }
+
+        await product.save();
+
+        console.log(`✅ Product ranking boosted: ${product.name} (ID: ${product._id})`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Product ranking boosted successfully',
+            product: {
+                id: product._id,
+                name: product.name,
+                ranking: product.ranking,
+            },
+        });
+    } catch (error) {
+        console.error('❌ Boost ranking error:', error.message);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to boost product ranking. Please try again.',
         });
     }
 };

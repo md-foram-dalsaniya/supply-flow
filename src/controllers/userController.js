@@ -2,9 +2,61 @@ const User = require('../models/User');
 const cloudinary = require('../config/cloudinary');
 const { Readable } = require('stream');
 
-// @desc    Get current user profile
-// @route   GET /api/users/me
-// @access  Private
+const formatSupplyPartnerSince = (date) => {
+    if (!date) return null;
+    const joinDate = new Date(date);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[joinDate.getMonth()];
+    const year = joinDate.getFullYear();
+    return `${month} ${year}`;
+};
+
+const formatEstablishedYear = (date) => {
+    if (!date) return null;
+    const establishedDate = new Date(date);
+    return establishedDate.getFullYear().toString();
+};
+
+const formatUserForProfile = (user) => {
+    const userObj = user.toObject ? user.toObject() : user;
+    
+    const businessInfo = userObj.businessInfo || {};
+    const formattedBusinessInfo = {
+        ...businessInfo,
+        establishedYear: formatEstablishedYear(businessInfo.establishedDate),
+    };
+    
+    return {
+        id: userObj._id || userObj.id,
+        name: userObj.name || '',
+        email: userObj.email || '',
+        phone: userObj.phone || '',
+        profileImage: userObj.profileImage || null,
+        supplyPartnerSince: formatSupplyPartnerSince(userObj.metrics?.joinDate || userObj.createdAt),
+        performanceMetrics: {
+            rating: userObj.metrics?.rating || 0,
+            onTimePercentage: userObj.metrics?.onTimePercentage || 0,
+            totalSupplied: userObj.metrics?.totalSupplied || 0,
+        },
+        paymentMethodsCount: userObj.paymentMethods ? userObj.paymentMethods.length : 0,
+        bankAccountsCount: userObj.bankAccounts ? userObj.bankAccounts.length : 0,
+        businessInfo: formattedBusinessInfo,
+        address: userObj.address || {},
+        businessHours: userObj.businessHours || {},
+        deliverySettings: userObj.deliverySettings || {},
+        paymentMethods: userObj.paymentMethods || [],
+        bankAccounts: userObj.bankAccounts || [],
+        website: userObj.website || '',
+        aboutUs: userObj.aboutUs || '',
+        specialties: userObj.specialties || [],
+        verification: userObj.verification || { isVerified: false },
+        badges: userObj.badges || [],
+        metrics: userObj.metrics || {},
+        createdAt: userObj.createdAt,
+        updatedAt: userObj.updatedAt,
+    };
+};
+
 exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -otp -otpExpireTime');
@@ -16,9 +68,11 @@ exports.getMe = async (req, res) => {
       });
     }
 
+    const formattedUser = formatUserForProfile(user);
+
     res.status(200).json({
       success: true,
-      user,
+      user: formattedUser,
     });
   } catch (error) {
     console.error('❌ Get me error:', error.message);
@@ -29,21 +83,6 @@ exports.getMe = async (req, res) => {
   }
 };
 
-/**
- * UPLOAD_PROFILE_IMAGE - Upload user's profile picture
- * 
- * What it does:
- * 1. Receives image file from request
- * 2. Uploads image to Cloudinary (image storage service)
- * 3. Gets back a URL from Cloudinary (direct link to image)
- * 4. Saves URL to user's profile in database
- * 5. Returns the image URL
- * 
- * URL: POST /api/users/upload-profile-image
- * Access: Private (requires login)
- * 
- * Note: Image is resized to max 500x500 pixels automatically
- */
 exports.uploadProfileImage = async (req, res) => {
   try {
     if (!req.file) {
@@ -53,7 +92,6 @@ exports.uploadProfileImage = async (req, res) => {
       });
     }
 
-    // Convert buffer to stream for Cloudinary
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: 'instasupply/profiles',
@@ -73,7 +111,6 @@ exports.uploadProfileImage = async (req, res) => {
         }
 
         try {
-          // Update user profile image
           const user = await User.findByIdAndUpdate(
             req.user.id,
             { profileImage: result.secure_url },
@@ -88,11 +125,14 @@ exports.uploadProfileImage = async (req, res) => {
           }
 
           console.log(`✅ Profile image uploaded: ${result.secure_url}`);
+          
+          const formattedUser = formatUserForProfile(user);
+          
           res.status(200).json({
             success: true,
             message: 'Profile image uploaded successfully',
             imageUrl: result.secure_url,
-            user,
+            user: formattedUser,
           });
         } catch (updateError) {
           console.error('❌ Database update error:', updateError.message);
@@ -104,7 +144,6 @@ exports.uploadProfileImage = async (req, res) => {
       }
     );
 
-    // Pipe the buffer to the stream
     const bufferStream = new Readable();
     bufferStream.push(req.file.buffer);
     bufferStream.push(null);
@@ -118,9 +157,6 @@ exports.uploadProfileImage = async (req, res) => {
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/users/profile
-// @access  Private
 exports.updateProfile = async (req, res) => {
   try {
     const {
@@ -137,18 +173,63 @@ exports.updateProfile = async (req, res) => {
       specialties,
     } = req.body;
 
+    const currentUser = await User.findById(req.user.id);
+    if (!currentUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
     const updateData = {};
-    if (name) updateData.name = name;
-    if (phone !== undefined) updateData.phone = phone;
-    if (businessInfo) updateData.businessInfo = businessInfo;
-    if (address) updateData.address = address;
-    if (businessHours) updateData.businessHours = businessHours;
-    if (deliverySettings) updateData.deliverySettings = deliverySettings;
-    if (paymentMethods) updateData.paymentMethods = paymentMethods;
-    if (bankAccounts) updateData.bankAccounts = bankAccounts;
-    if (website !== undefined) updateData.website = website;
-    if (aboutUs !== undefined) updateData.aboutUs = aboutUs;
-    if (specialties !== undefined) updateData.specialties = specialties;
+    if (name) updateData.name = name.trim();
+    if (phone !== undefined) updateData.phone = phone ? phone.trim() : '';
+    
+    if (businessInfo !== undefined) {
+      const existingBusinessInfo = currentUser.businessInfo || {};
+      updateData.businessInfo = {
+        ...existingBusinessInfo,
+        ...(businessInfo.fullBusinessName !== undefined && { fullBusinessName: businessInfo.fullBusinessName.trim() }),
+        ...(businessInfo.businessType !== undefined && { businessType: businessInfo.businessType.trim() }),
+        ...(businessInfo.registrationNumber !== undefined && { registrationNumber: businessInfo.registrationNumber.trim() }),
+        ...(businessInfo.taxId !== undefined && { taxId: businessInfo.taxId.trim() }),
+        ...(businessInfo.establishedDate !== undefined && { establishedDate: businessInfo.establishedDate ? new Date(businessInfo.establishedDate) : null }),
+      };
+    }
+    
+    if (address !== undefined) {
+      const existingAddress = currentUser.address || {};
+      updateData.address = {
+        ...existingAddress,
+        ...(address.street !== undefined && { street: address.street.trim() }),
+        ...(address.city !== undefined && { city: address.city.trim() }),
+        ...(address.state !== undefined && { state: address.state.trim() }),
+        ...(address.zipCode !== undefined && { zipCode: address.zipCode.trim() }),
+        ...(address.country !== undefined && { country: address.country.trim() }),
+      };
+    }
+    
+    if (businessHours !== undefined) {
+      const existingBusinessHours = currentUser.businessHours || {};
+      updateData.businessHours = {
+        ...existingBusinessHours,
+        ...businessHours,
+      };
+    }
+    
+    if (deliverySettings !== undefined) {
+      const existingDeliverySettings = currentUser.deliverySettings || {};
+      updateData.deliverySettings = {
+        ...existingDeliverySettings,
+        ...deliverySettings,
+      };
+    }
+    
+    if (paymentMethods !== undefined) updateData.paymentMethods = paymentMethods;
+    if (bankAccounts !== undefined) updateData.bankAccounts = bankAccounts;
+    if (website !== undefined) updateData.website = website ? website.trim() : '';
+    if (aboutUs !== undefined) updateData.aboutUs = aboutUs ? aboutUs.trim() : '';
+    if (specialties !== undefined) updateData.specialties = Array.isArray(specialties) ? specialties : [];
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
@@ -163,10 +244,14 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
+    const formattedUser = formatUserForProfile(user);
+
+    console.log(`✅ Profile updated: ${user.name} (ID: ${user._id})`);
+
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      user,
+      user: formattedUser,
     });
   } catch (error) {
     console.error('❌ Update profile error:', error.message);
@@ -177,9 +262,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// @desc    Get profile information (detailed)
-// @route   GET /api/users/profile-info
-// @access  Private
 exports.getProfileInfo = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password -otp -otpExpireTime');
@@ -191,25 +273,47 @@ exports.getProfileInfo = async (req, res) => {
       });
     }
 
+    const formattedUser = formatUserForProfile(user);
+
     res.status(200).json({
       success: true,
       profile: {
-        name: user.name,
-        profileImage: user.profileImage,
-        businessInfo: user.businessInfo,
-        businessType: user.businessInfo?.businessType || '',
-        contactInfo: {
-          email: user.email,
-          phone: user.phone,
-          website: user.website,
+        name: formattedUser.name,
+        profileImage: formattedUser.profileImage,
+        supplyPartnerSince: formattedUser.supplyPartnerSince,
+        businessInfo: {
+          fullBusinessName: formattedUser.businessInfo?.fullBusinessName || '',
+          businessType: formattedUser.businessInfo?.businessType || '',
+          registrationNumber: formattedUser.businessInfo?.registrationNumber || '',
+          taxId: formattedUser.businessInfo?.taxId || '',
+          establishedDate: formattedUser.businessInfo?.establishedDate || null,
+          establishedYear: formattedUser.businessInfo?.establishedYear || null,
         },
-        address: user.address,
-        businessHours: user.businessHours,
-        aboutUs: user.aboutUs,
-        specialties: user.specialties || [],
-        verification: user.verification,
-        badges: user.badges || [],
-        metrics: user.metrics,
+        businessType: formattedUser.businessInfo?.businessType || '',
+        contactInfo: {
+          email: formattedUser.email,
+          phone: formattedUser.phone,
+          website: formattedUser.website,
+        },
+        address: {
+          street: formattedUser.address?.street || '',
+          city: formattedUser.address?.city || '',
+          state: formattedUser.address?.state || '',
+          zipCode: formattedUser.address?.zipCode || '',
+          country: formattedUser.address?.country || '',
+        },
+        businessHours: formattedUser.businessHours,
+        deliverySettings: formattedUser.deliverySettings,
+        aboutUs: formattedUser.aboutUs,
+        specialties: formattedUser.specialties,
+        verification: formattedUser.verification,
+        badges: formattedUser.badges,
+        metrics: formattedUser.metrics,
+        performanceMetrics: formattedUser.performanceMetrics,
+        paymentMethods: formattedUser.paymentMethods,
+        paymentMethodsCount: formattedUser.paymentMethodsCount,
+        bankAccounts: formattedUser.bankAccounts,
+        bankAccountsCount: formattedUser.bankAccountsCount,
       },
     });
   } catch (error) {
@@ -220,4 +324,3 @@ exports.getProfileInfo = async (req, res) => {
     });
   }
 };
-

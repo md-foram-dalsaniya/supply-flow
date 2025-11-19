@@ -1,70 +1,103 @@
-/**
- * AUTH_CONTROLLER.JS - Authentication Functions
- * 
- * This file handles user registration, login, and logout.
- * It manages OTP codes and JWT tokens.
- */
-
 const User = require('../models/User');
 const generateOTP = require('../utils/generateOTP');
 const sendOTPEmail = require('../utils/sendEmail');
 const generateToken = require('../utils/generateToken');
 
-/**
- * REGISTER - Create a new user account
- * 
- * What it does:
- * 1. Takes user info (name, email, password) from request
- * 2. Checks if email already exists
- * 3. Creates a 4-digit OTP code
- * 4. Saves user to database (password is automatically hashed)
- * 5. Sends OTP to user's email
- * 6. Returns success message
- * 
- * URL: POST /api/auth/register
- * Access: Public (anyone can register)
- */
 exports.register = async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
+    const { businessName, email, password } = req.body;
+    const imageFile = req.file;
 
-    // Validation
-    if (!name || !email || !password) {
+    if (!businessName || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide name, email, and password',
+        message: 'Please provide business name, email, and password',
       });
     }
 
-    // Check if user already exists
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address',
+      });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long',
+      });
+    }
+
+    const passwordStrengthRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+    if (!passwordStrengthRegex.test(password)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+      });
+    }
+
     const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email',
+        message: 'An account with this email already exists. Please use a different email or login instead.',
       });
     }
 
-    // Generate 4-digit OTP
-    const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute from now
+    let profileImageUrl = null;
+    if (imageFile) {
+      try {
+        const cloudinary = require('../config/cloudinary');
+        const { Readable } = require('stream');
+        
+        const uploadPromise = new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'instasupply/profiles',
+              resource_type: 'image',
+              transformation: [
+                { width: 500, height: 500, crop: 'limit' },
+                { quality: 'auto' },
+              ],
+            },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result.secure_url);
+            }
+          );
 
-    // Create user
+          const bufferStream = new Readable();
+          bufferStream.push(imageFile.buffer);
+          bufferStream.push(null);
+          bufferStream.pipe(stream);
+        });
+
+        profileImageUrl = await uploadPromise;
+        console.log(`✅ Profile image uploaded: ${profileImageUrl}`);
+      } catch (imageError) {
+        console.error('❌ Error uploading profile image:', imageError.message);
+      }
+    }
+
+    const otp = generateOTP();
+    const otpExpireTime = new Date(Date.now() + 60 * 1000);
+
     const user = await User.create({
-      name,
+      name: businessName,
       email: email.toLowerCase(),
-      password, // Will be hashed by pre-save hook
-      phone: phone || '',
+      password,
+      profileImage: profileImageUrl,
       otp,
       otpExpireTime,
+      isVerified: false,
     });
 
-    // Send OTP to email
     console.log(`📧 Sending OTP to ${user.email}...`);
     const emailSent = await sendOTPEmail(user.email, otp);
 
     if (!emailSent) {
-      // If email fails, still return success but log the error
       console.error('❌ Failed to send OTP email to:', user.email);
     } else {
       console.log(`✅ OTP sent successfully to ${user.email}`);
@@ -72,12 +105,11 @@ exports.register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'OTP sent to email.',
+      message: 'Registration successful. OTP sent to email for verification.',
     });
   } catch (error) {
     console.error('❌ Registration error:', error.message);
 
-    // Return clean error message without stack trace
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -92,25 +124,10 @@ exports.register = async (req, res) => {
   }
 };
 
-/**
- * VERIFY_OTP - Verify OTP code and log user in
- * 
- * What it does:
- * 1. Takes email and OTP code from request
- * 2. Finds user in database
- * 3. Checks if OTP matches and hasn't expired
- * 4. Clears OTP from database (can't reuse it)
- * 5. Creates a JWT token (like an ID card)
- * 6. Returns token and user info
- * 
- * URL: POST /api/auth/verify-otp
- * Access: Public
- */
 exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
 
-    // Validation
     if (!email || !otp) {
       return res.status(400).json({
         success: false,
@@ -118,7 +135,6 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
-    // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -128,7 +144,6 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
-    // Check if OTP matches
     if (user.otp !== otp) {
       return res.status(400).json({
         success: false,
@@ -136,7 +151,6 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
-    // Check if OTP has expired
     if (!user.otpExpireTime || new Date() > user.otpExpireTime) {
       return res.status(400).json({
         success: false,
@@ -144,27 +158,16 @@ exports.verifyOTP = async (req, res) => {
       });
     }
 
-    // Clear OTP and expiry time
+    user.isVerified = true;
     user.otp = null;
     user.otpExpireTime = null;
     await user.save();
 
-    // Generate JWT token
-    const token = generateToken(user._id);
-    console.log(`✅ User ${user.email} logged in successfully`);
+    console.log(`✅ User ${user.email} verified successfully`);
 
-    // Return token and user details
     res.status(200).json({
       success: true,
-      message: 'OTP verified successfully',
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        profileImage: user.profileImage,
-      },
+      message: 'OTP verified successfully. You can now login.',
     });
   } catch (error) {
     console.error('❌ OTP verification error:', error.message);
@@ -175,27 +178,70 @@ exports.verifyOTP = async (req, res) => {
   }
 };
 
-/**
- * REQUEST_OTP - Send a new OTP code to user's email
- * 
- * What it does:
- * 1. Takes email from request
- * 2. Finds user in database
- * 3. Generates a new 4-digit OTP code
- * 4. Saves OTP to database (expires in 1 minute)
- * 5. Sends OTP to user's email
- * 6. Returns success message
- * 
- * URL: POST /api/auth/request-otp
- * Access: Public
- * 
- * Note: Used when user wants to login but doesn't have an OTP yet
- */
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email and password',
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: 'Please verify your email with OTP before logging in. Check your email for the OTP code.',
+      });
+    }
+
+    const isPasswordValid = await user.matchPassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password',
+      });
+    }
+
+    const token = generateToken(user._id);
+    console.log(`✅ User ${user.email} logged in successfully`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        profileImage: user.profileImage,
+        isVerified: user.isVerified,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Login error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to login. Please try again.',
+    });
+  }
+};
+
 exports.requestOTP = async (req, res) => {
   try {
     const { email } = req.body;
 
-    // Validation
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -203,7 +249,6 @@ exports.requestOTP = async (req, res) => {
       });
     }
 
-    // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
@@ -213,16 +258,13 @@ exports.requestOTP = async (req, res) => {
       });
     }
 
-    // Generate new 4-digit OTP
     const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute from now
+    const otpExpireTime = new Date(Date.now() + 60 * 1000);
 
-    // Update user with new OTP
     user.otp = otp;
     user.otpExpireTime = otpExpireTime;
     await user.save();
 
-    // Send OTP to email
     const emailSent = await sendOTPEmail(user.email, otp);
 
     if (!emailSent) {
@@ -247,20 +289,6 @@ exports.requestOTP = async (req, res) => {
   }
 };
 
-/**
- * LOGOUT - Log user out
- * 
- * What it does:
- * 1. Simply returns a success message
- * 2. Client should delete the token from storage
- * 
- * URL: POST /api/auth/logout
- * Access: Private (requires login)
- * 
- * Note: In JWT systems, logout is usually handled by deleting the token
- * on the client side. The server doesn't store tokens, so there's nothing
- * to delete on the server. But we provide this endpoint for consistency.
- */
 exports.logout = async (req, res) => {
   try {
     console.log(`👋 User ${req.user.email} logged out`);
@@ -277,25 +305,10 @@ exports.logout = async (req, res) => {
   }
 };
 
-/**
- * CHANGE_EMAIL_DURING_VERIFICATION - Change email address before OTP verification
- * 
- * What it does:
- * 1. Takes old email and new email from request
- * 2. Finds user with old email (must be unverified/pending)
- * 3. Checks if new email is already taken
- * 4. Updates email address
- * 5. Generates new OTP and sends to new email
- * 6. Returns success message
- * 
- * URL: POST /api/auth/change-email
- * Access: Public
- */
 exports.changeEmailDuringVerification = async (req, res) => {
   try {
     const { oldEmail, newEmail } = req.body;
 
-    // Validation
     if (!oldEmail || !newEmail) {
       return res.status(400).json({
         success: false,
@@ -303,7 +316,6 @@ exports.changeEmailDuringVerification = async (req, res) => {
       });
     }
 
-    // Email format validation
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
     if (!emailRegex.test(newEmail)) {
       return res.status(400).json({
@@ -312,7 +324,6 @@ exports.changeEmailDuringVerification = async (req, res) => {
       });
     }
 
-    // Find user by old email
     const user = await User.findOne({ email: oldEmail.toLowerCase() });
 
     if (!user) {
@@ -322,7 +333,6 @@ exports.changeEmailDuringVerification = async (req, res) => {
       });
     }
 
-    // Check if user is already verified (has no OTP)
     if (!user.otp) {
       return res.status(400).json({
         success: false,
@@ -330,7 +340,6 @@ exports.changeEmailDuringVerification = async (req, res) => {
       });
     }
 
-    // Check if new email is already taken
     const existingUser = await User.findOne({ email: newEmail.toLowerCase() });
     if (existingUser && existingUser._id.toString() !== user._id.toString()) {
       return res.status(400).json({
@@ -339,18 +348,15 @@ exports.changeEmailDuringVerification = async (req, res) => {
       });
     }
 
-    // Update email
     user.email = newEmail.toLowerCase();
 
-    // Generate new OTP for new email
     const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute from now
+    const otpExpireTime = new Date(Date.now() + 60 * 1000);
     user.otp = otp;
     user.otpExpireTime = otpExpireTime;
 
     await user.save();
 
-    // Send OTP to new email
     console.log(`📧 Sending OTP to new email: ${user.email}...`);
     const emailSent = await sendOTPEmail(user.email, otp);
 
@@ -383,18 +389,6 @@ exports.changeEmailDuringVerification = async (req, res) => {
   }
 };
 
-/**
- * CREATE_TEST_USERS - Create multiple test supplier accounts for testing
- * 
- * What it does:
- * 1. Creates 5 different test supplier accounts
- * 2. Each account has different business names, emails, and passwords
- * 3. Generates OTPs for each account
- * 4. Returns all created test users (without passwords)
- * 
- * URL: POST /api/auth/create-test-users
- * Access: Public (for testing only)
- */
 exports.createTestUsers = async (req, res) => {
   try {
     const testUsers = [
@@ -435,7 +429,6 @@ exports.createTestUsers = async (req, res) => {
 
     for (const testUser of testUsers) {
       try {
-        // Check if user already exists
         const existingUser = await User.findOne({ email: testUser.email.toLowerCase() });
 
         if (existingUser) {
@@ -446,11 +439,9 @@ exports.createTestUsers = async (req, res) => {
           continue;
         }
 
-        // Generate OTP
         const otp = generateOTP();
-        const otpExpireTime = new Date(Date.now() + 60 * 1000); // 1 minute from now
+        const otpExpireTime = new Date(Date.now() + 60 * 1000);
 
-        // Create user
         const user = await User.create({
           name: testUser.name,
           email: testUser.email.toLowerCase(),
@@ -460,7 +451,6 @@ exports.createTestUsers = async (req, res) => {
           otpExpireTime,
         });
 
-        // Send OTP to email
         const emailSent = await sendOTPEmail(user.email, otp);
 
         if (!emailSent) {
@@ -474,7 +464,7 @@ exports.createTestUsers = async (req, res) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          otp: otp, // Include OTP for testing purposes
+          otp: otp,
           message: emailSent ? 'OTP sent to email' : 'User created but OTP email failed',
         });
       } catch (error) {
@@ -501,4 +491,3 @@ exports.createTestUsers = async (req, res) => {
     });
   }
 };
-

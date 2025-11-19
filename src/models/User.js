@@ -25,8 +25,12 @@ const userSchema = new mongoose.Schema({
     password: {
         type: String,
         required: [true, 'Please provide a password'],
-        minlength: [6, 'Password must be at least 6 characters'],
+        minlength: [8, 'Password must be at least 8 characters'],
         select: false, // Don't return password by default
+    },
+    isVerified: {
+        type: Boolean,
+        default: false,
     },
     otp: {
         type: String,
@@ -40,7 +44,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    // Extended profile fields
     businessInfo: {
         registrationNumber: String,
         taxId: String,
@@ -114,7 +117,6 @@ const userSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-// Hash password before saving
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) {
         return next();
@@ -124,8 +126,11 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
-// Method to compare password
 userSchema.methods.comparePassword = async function (enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password);
+};
+
+userSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 

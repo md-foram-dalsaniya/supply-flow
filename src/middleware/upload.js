@@ -1,31 +1,70 @@
 const multer = require('multer');
 const path = require('path');
 
-// Configure multer for memory storage (required for Cloudinary)
 const storage = multer.memoryStorage();
 
-// File filter - only images
 const fileFilter = (req, file, cb) => {
-  // Allowed file types
-  const allowedTypes = /jpeg|jpg|png|gif|webp/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
+  const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|svg)$/i;
+  const allowedMimeTypes = /^image\/(jpeg|jpg|png|gif|webp|svg\+xml|svg)$/;
+
+  const extname = allowedExtensions.test(path.extname(file.originalname));
+  const mimetype = allowedMimeTypes.test(file.mimetype);
 
   if (mimetype && extname) {
     return cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
+    cb(new Error('Invalid image format. Supported formats: JPG, JPEG, PNG, GIF, WEBP, SVG.'));
   }
 };
 
-// Configure multer
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 10 * 1024 * 1024,
   },
   fileFilter: fileFilter,
 });
 
-module.exports = upload;
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Image size exceeds the maximum allowed size of 10 MB. Please upload a smaller image.',
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({
+        success: false,
+        message: 'Too many files. Please check the maximum allowed number of files.',
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        success: false,
+        message: 'Unexpected file field. Please check the field name.',
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: `File upload error: ${err.message}`,
+    });
+  }
 
+  if (err) {
+    if (err.message.includes('Invalid image format')) {
+      return res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'File upload error. Please try again.',
+    });
+  }
+
+  next();
+};
+
+module.exports = { upload, handleMulterError };

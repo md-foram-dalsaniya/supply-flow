@@ -115,14 +115,12 @@ const productSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-// Index for search functionality
 productSchema.index({ name: 'text', description: 'text' });
 productSchema.index({ category: 1 });
 productSchema.index({ supplier: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ soldQuantity: -1 });
 
-// Virtual to check if stock is low
 productSchema.virtual('isLowStock').get(function () {
     return this.stock <= this.lowStockThreshold;
 });

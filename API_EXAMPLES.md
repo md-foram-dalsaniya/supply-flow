@@ -8,35 +8,49 @@ Complete examples of all API requests with request bodies and expected responses
 
 ### 1. Register New Supplier Account
 
-**Request:**
+**Request (Without Image - JSON):**
 ```http
 POST http://localhost:3000/api/auth/register
 Content-Type: application/json
 
 {
-  "name": "Urban Supply Co.",
+  "businessName": "Urban Supply Co.",
   "email": "supplier@example.com",
-  "password": "password123",
-  "phone": "1234567890"
+  "password": "Password123"
 }
 ```
+
+**Request (With Image - Use form-data):**
+```http
+POST http://localhost:3000/api/auth/register
+Content-Type: multipart/form-data
+```
+
+**Required Fields:**
+- `businessName` - Your business name (e.g., "Urban Supply Co.", "Builders Depot")
+- `email` - Valid email address (must be unique)
+- `password` - Password with:
+  - Minimum 8 characters
+  - At least one uppercase letter
+  - At least one lowercase letter
+  - At least one number
+
+**Optional Fields:**
+- `image` - Profile image file (JPG, JPEG, PNG, GIF, WEBP, SVG, max 10 MB)
+
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "OTP sent to email."
+  "message": "Registration successful. OTP sent to email for verification."
 }
 ```
 
-**Note:** 
-- `name` is your **Business Name** (e.g., "Urban Supply Co.", "Builders Depot")
-- After registration, check your email for the 4-digit OTP code
-- You'll need to verify the OTP before you can login
 
 ---
 
-### 2. Verify OTP and Login
+### 2. Verify OTP
 
 **Request:**
 ```http
@@ -44,7 +58,7 @@ POST http://localhost:3000/api/auth/verify-otp
 Content-Type: application/json
 
 {
-  "email": "john@example.com",
+  "email": "supplier@example.com",
   "otp": "1234"
 }
 ```
@@ -53,23 +67,47 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "message": "OTP verified successfully",
+  "message": "OTP verified successfully. You can now login."
+}
+```
+
+
+---
+
+### 3. Login
+
+**Request:**
+```http
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "supplier@example.com",
+  "password": "Password123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
     "id": "507f1f77bcf86cd799439011",
-    "name": "John Doe",
-    "email": "john@example.com",
-    "phone": "1234567890",
-    "profileImage": null
+    "name": "Urban Supply Co.",
+    "email": "supplier@example.com",
+    "phone": "",
+    "profileImage": "https://res.cloudinary.com/.../profile.jpg",
+    "isVerified": true
   }
 }
 ```
 
-**Note:** Save the `token` - you'll need it for protected routes!
 
 ---
 
-### 3. Request New OTP
+### 4. Request New OTP
 
 **Request:**
 ```http
@@ -91,7 +129,7 @@ Content-Type: application/json
 
 ---
 
-### 4. Logout
+### 5. Logout
 
 **Request:**
 ```http
@@ -109,7 +147,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 5. Change Email During Verification
+### 6. Change Email During Verification
 
 **Request:**
 ```http
@@ -131,80 +169,12 @@ Content-Type: application/json
 }
 ```
 
-**Note:** 
-- Use this endpoint if you entered the wrong email during registration
-- Only works if you haven't verified your OTP yet (account is still pending verification)
-- A new OTP will be automatically sent to your new email address
-- You can then verify with the new email and OTP
-
----
-
-<!-- ### 6. Create Test Users (For Testing Only)
-
-**Request:**
-```http
-POST http://localhost:3000/api/auth/create-test-users
-Content-Type: application/json
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Created 5 test user(s)",
-  "users": [
-    {
-      "id": "507f1f77bcf86cd799439011",
-      "name": "Urban Supply Co.",
-      "email": "urban.supply@test.com",
-      "phone": "+1-555-0101",
-      "otp": "1234",
-      "message": "OTP sent to email"
-    },
-    {
-      "id": "507f1f77bcf86cd799439012",
-      "name": "Builders Depot",
-      "email": "builders.depot@test.com",
-      "phone": "+1-555-0102",
-      "otp": "5678",
-      "message": "OTP sent to email"
-    },
-    {
-      "id": "507f1f77bcf86cd799439013",
-      "name": "Hardware Plus",
-      "email": "hardware.plus@test.com",
-      "phone": "+1-555-0103",
-      "otp": "9012",
-      "message": "OTP sent to email"
-    },
-    {
-      "id": "507f1f77bcf86cd799439014",
-      "name": "Contractor Supply",
-      "email": "contractor.supply@test.com",
-      "phone": "+1-555-0104",
-      "otp": "3456",
-      "message": "OTP sent to email"
-    },
-    {
-      "id": "507f1f77bcf86cd799439015",
-      "name": "Pro Tools & Materials",
-      "email": "pro.tools@test.com",
-      "phone": "+1-555-0105",
-      "otp": "7890",
-      "message": "OTP sent to email"
-    }
-  ],
-  "note": "All test users have password: Test123!"
-} -->
-```
-
-<!-- **Note:** This endpoint creates 5 pre-configured test supplier accounts for testing purposes. All test users have the password `Test123!`. The OTP is included in the response for easy testing. If a user already exists, it will be skipped and listed in the `errors` array. -->
 
 ---
 
 ## 👤 User Profile APIs
 
-### 5. Get Current User
+### 6. Get Current User
 
 **Request:**
 ```http
@@ -218,42 +188,138 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "success": true,
   "user": {
     "id": "507f1f77bcf86cd799439011",
-    "name": "John Doe",
-    "email": "john@example.com",
+    "name": "Urban Supply Co.",
+    "email": "contact@urbansupply.com",
     "phone": "1234567890",
-    "profileImage": "https://res.cloudinary.com/.../profile.jpg"
+    "profileImage": "https://res.cloudinary.com/.../profile.jpg",
+    "supplyPartnerSince": "Jan 2025",
+    "performanceMetrics": {
+      "rating": 4.8,
+      "onTimePercentage": 98,
+      "totalSupplied": 532
+    },
+    "paymentMethodsCount": 2,
+    "bankAccountsCount": 1,
+    "businessInfo": {
+      "fullBusinessName": "Urban Supply Co. Ltd.",
+      "businessType": "Building Materials Supplier",
+      "registrationNumber": "BRN78598651",
+      "taxId": "TIN4587123645",
+      "establishedDate": "2024-01-15T00:00:00.000Z",
+      "establishedYear": "2024"
+    },
+    "address": {
+      "street": "123 Main St",
+      "city": "New York",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "USA"
+    },
+    "businessHours": {
+      "monday": { "open": "09:00", "close": "21:00", "isOpen": true },
+      "tuesday": { "open": "09:00", "close": "21:00", "isOpen": true },
+      "wednesday": { "open": "09:00", "close": "21:00", "isOpen": true },
+      "thursday": { "open": "09:00", "close": "21:00", "isOpen": true },
+      "friday": { "open": "09:00", "close": "21:00", "isOpen": true },
+      "saturday": { "open": "10:00", "close": "18:00", "isOpen": true },
+      "sunday": { "open": "10:00", "close": "18:00", "isOpen": false }
+    },
+    "deliverySettings": {
+      "deliveryRadius": 50,
+      "deliveryFee": 5.99,
+      "freeDeliveryThreshold": 100,
+      "deliveryTime": "2-3 days"
+    },
+    "paymentMethods": [
+      {
+        "type": "card",
+        "last4": "4242",
+        "brand": "Visa",
+        "isDefault": true
+      },
+      {
+        "type": "card",
+        "last4": "8888",
+        "brand": "Mastercard",
+        "isDefault": false
+      }
+    ],
+    "bankAccounts": [
+      {
+        "bankName": "Chase Bank",
+        "accountNumber": "****1234",
+        "routingNumber": "****5678",
+        "accountHolderName": "Urban Supply Co.",
+        "isDefault": true
+      }
+    ],
+    "website": "https://urbansupply.com",
+    "aboutUs": "Leading supplier of building materials and tools...",
+    "specialties": ["Building Materials", "Power Tools", "Plumbing"],
+    "verification": {
+      "isVerified": true,
+      "verifiedDate": "2025-01-15T00:00:00.000Z"
+    },
+    "badges": ["Top Rated", "Verified"],
+    "metrics": {
+      "rating": 4.8,
+      "onTimePercentage": 98,
+      "totalSupplied": 532,
+      "joinDate": "2025-01-15T00:00:00.000Z"
+    },
+    "createdAt": "2025-01-15T00:00:00.000Z",
+    "updatedAt": "2025-01-16T00:00:00.000Z"
   }
 }
 ```
 
+
 ---
 
-### 6. Update Profile
+### 7. Update Profile
 
-**Request:**
+**Request (Full Update):**
 ```http
 PUT http://localhost:3000/api/users/profile
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "name": "John Smith",
-  "phone": "9876543210",
+  "name": "Urban Supply Co.",
+  "phone": "+1 (555) 234-5678",
   "businessInfo": {
-    "registrationNumber": "REG123456",
-    "taxId": "TAX789",
-    "businessType": "LLC",
-    "establishedDate": "2020-01-15"
+    "fullBusinessName": "Urban Supply Co. Ltd.",
+    "businessType": "Building Materials Supplier",
+    "registrationNumber": "BRN78598651",
+    "taxId": "TIN4587123645",
+    "establishedDate": "2024-01-15"
   },
   "address": {
-    "street": "123 Main St",
-    "city": "New York",
+    "street": "1234 Construction Avenue, Suite 500",
+    "city": "Metropolis",
     "state": "NY",
     "zipCode": "10001",
-    "country": "USA"
+    "country": "United States"
+  },
+  "website": "www.urbansupplyco.com",
+  "aboutUs": "Urban Supply Co. is a leading supplier of building materials, tools, and hardware for contractors, builders, and DIY enthusiasts. Established in 2015, we pride ourselves on providing high-quality products at competitive prices with exceptional customer service.",
+  "specialties": ["Building Materials", "Power Tools", "Plumbing", "Electrical Supplies", "Hardware"]
+}
+```
+
+**Request (Partial Update - Only Business Info):**
+```http
+PUT http://localhost:3000/api/users/profile
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "businessInfo": {
+    "taxId": "TIN4587123645"
   }
 }
 ```
+
 
 **Response:**
 ```json
@@ -262,18 +328,45 @@ Content-Type: application/json
   "message": "Profile updated successfully",
   "user": {
     "id": "507f1f77bcf86cd799439011",
-    "name": "John Smith",
-    "email": "john@example.com",
-    "phone": "9876543210",
-    "businessInfo": { ... },
-    "address": { ... }
+    "name": "Urban Supply Co.",
+    "email": "contact@urbansupply.com",
+    "phone": "+1 (555) 234-5678",
+    "profileImage": "https://res.cloudinary.com/.../profile.jpg",
+    "supplyPartnerSince": "Jan 2025",
+    "performanceMetrics": {
+      "rating": 4.8,
+      "onTimePercentage": 98,
+      "totalSupplied": 532
+    },
+    "businessInfo": {
+      "fullBusinessName": "Urban Supply Co. Ltd.",
+      "businessType": "Building Materials Supplier",
+      "registrationNumber": "BRN78598651",
+      "taxId": "TIN4587123645",
+      "establishedDate": "2024-01-15T00:00:00.000Z",
+      "establishedYear": "2024"
+    },
+    "address": {
+      "street": "1234 Construction Avenue, Suite 500",
+      "city": "Metropolis",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "United States"
+    },
+    "website": "www.urbansupplyco.com",
+    "aboutUs": "Urban Supply Co. is a leading supplier...",
+    "specialties": ["Building Materials", "Power Tools", "Plumbing", "Electrical Supplies", "Hardware"],
+    "paymentMethodsCount": 2,
+    "bankAccountsCount": 1,
+    "createdAt": "2025-01-15T00:00:00.000Z",
+    "updatedAt": "2025-01-16T00:00:00.000Z"
   }
 }
 ```
 
 ---
 
-### 7. Upload Profile Image
+### 8. Upload Profile Image
 
 **Request:**
 ```http
@@ -281,20 +374,7 @@ POST http://localhost:3000/api/users/upload-profile-image
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**⚠️ IMPORTANT - Postman Setup Instructions:**
-
-1. **Method:** Select `POST`
-2. **URL:** Enter the endpoint URL
-3. **Headers:** 
-   - Add `Authorization: Bearer YOUR_TOKEN`
-   - **DO NOT manually add `Content-Type` header** - Postman will add it automatically with the boundary parameter
-4. **Body Tab:**
-   - Select `form-data` (NOT `raw` or `x-www-form-urlencoded`)
-   - Add a new field:
-     - **Key:** `image` (must be exactly "image")
-     - **Type:** Change from "Text" to "File" (click the dropdown next to the key)
-     - **Value:** Click "Select Files" and choose your image file
-5. **Send** the request
+**Image:** JPG, JPEG, PNG, GIF, WEBP, SVG (max 10 MB). Use form-data with field name `image`.
 
 **Response:**
 ```json
@@ -308,7 +388,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 8. Get Detailed Profile Info
+### 9. Get Detailed Profile Info
 
 **Request:**
 ```http
@@ -321,32 +401,98 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 {
   "success": true,
   "profile": {
-    "name": "John Doe",
+    "name": "Urban Supply Co.",
     "profileImage": "https://res.cloudinary.com/.../profile.jpg",
-    "businessInfo": { ... },
-    "businessType": "LLC",
-    "contactInfo": {
-      "email": "john@example.com",
-      "phone": "1234567890",
-      "website": ""
+    "supplyPartnerSince": "Jan 2025",
+    "businessInfo": {
+      "fullBusinessName": "Urban Supply Co. Ltd.",
+      "businessType": "Building Materials Supplier",
+      "registrationNumber": "BRN78598651",
+      "taxId": "TIN4587123645",
+      "establishedDate": "2024-01-15T00:00:00.000Z",
+      "establishedYear": "2024"
     },
-    "address": { ... },
-    "businessHours": { ... },
+    "businessType": "Building Materials Supplier",
+    "contactInfo": {
+      "email": "info@urbansupplyco.com",
+      "phone": "+1 (555) 234-5678",
+      "website": "www.urbansupplyco.com"
+    },
+    "address": {
+      "street": "1234 Construction Avenue, Suite 500",
+      "city": "Metropolis",
+      "state": "NY",
+      "zipCode": "10001",
+      "country": "United States"
+    },
+    "businessHours": {
+      "monday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "tuesday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "wednesday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "thursday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "friday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "saturday": { "open": "8:00 AM", "close": "6:00 PM", "isOpen": true },
+      "sunday": { "open": "", "close": "", "isOpen": false }
+    },
+    "deliverySettings": {
+      "deliveryRadius": 50,
+      "deliveryFee": 5.99,
+      "freeDeliveryThreshold": 100,
+      "deliveryTime": "2-3 days"
+    },
+    "aboutUs": "Urban Supply Co. is a leading supplier of building materials, tools, and hardware for contractors, builders, and DIY enthusiasts. Established in 2015, we pride ourselves on providing high-quality products at competitive prices with exceptional customer service.",
+    "specialties": ["Building Materials", "Power Tools", "Plumbing", "Electrical Supplies", "Hardware"],
+    "verification": {
+      "isVerified": true,
+      "verifiedDate": "2025-01-15T00:00:00.000Z"
+    },
+    "badges": ["Top Rated", "Verified"],
     "metrics": {
-      "rating": 4.5,
-      "onTimePercentage": 95,
-      "totalSupplied": 1500,
-      "joinDate": "2024-01-15T00:00:00.000Z"
-    }
+      "rating": 4.8,
+      "onTimePercentage": 98,
+      "totalSupplied": 532,
+      "joinDate": "2025-01-15T00:00:00.000Z"
+    },
+    "performanceMetrics": {
+      "rating": 4.8,
+      "onTimePercentage": 98,
+      "totalSupplied": 532
+    },
+    "paymentMethods": [
+      {
+        "type": "card",
+        "last4": "4242",
+        "brand": "Visa",
+        "isDefault": true
+      },
+      {
+        "type": "card",
+        "last4": "8888",
+        "brand": "Mastercard",
+        "isDefault": false
+      }
+    ],
+    "paymentMethodsCount": 2,
+    "bankAccounts": [
+      {
+        "bankName": "Chase Bank",
+        "accountNumber": "****1234",
+        "routingNumber": "****5678",
+        "accountHolderName": "Urban Supply Co.",
+        "isDefault": true
+      }
+    ],
+    "bankAccountsCount": 1
   }
 }
 ```
+
 
 ---
 
 ## 📦 Product APIs
 
-### 9. Get All Products
+### 10. Get All Products
 
 **Request:**
 ```http
@@ -412,7 +558,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 10. Get Single Product
+### 11. Get Single Product
 
 **Request:**
 ```http
@@ -458,7 +604,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 11. Create Product
+### 12. Create Product
 
 **Request:**
 ```http
@@ -467,27 +613,27 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "name": "Screwdriver Set",
-  "category": "Tools",
-  "description": "Professional screwdriver set with 10 pieces",
-  "price": 39.99,
-  "stock": 100,
-  "lowStockThreshold": 20,
-  "discount": 15,
-  "unit": "Set",
+  "name": "Premium Cement (50kg)",
+  "category": "Building Materials",
+  "description": "High-quality premium cement for construction projects",
+  "price": 12.99,
+  "stock": 120,
+  "discount": 0,
+  "unit": "Bag",
   "specifications": [
-    { "name": "Pieces", "value": "10" },
-    { "name": "Material", "value": "Chrome Vanadium" }
+    { "name": "Weight", "value": "50kg" },
+    { "name": "Type", "value": "Portland Cement" },
+    { "name": "Grade", "value": "53" }
   ],
   "deliveryOptions": {
     "availableForDelivery": true,
-    "availableForPickup": true
-  },
-  "ranking": {
-    "tags": ["Popular"]
+    "availableForPickup": false
   }
 }
 ```
+
+**Required:** `name`, `category`, `price`, `stock`  
+**Optional:** `description`, `discount`, `unit`, `specifications`, `deliveryOptions`, `lowStockThreshold`
 
 **Response:**
 ```json
@@ -496,15 +642,27 @@ Content-Type: application/json
   "message": "Product created successfully",
   "product": {
     "id": "507f1f77bcf86cd799439012",
-    "name": "Screwdriver Set",
-    "category": "Tools",
-    "price": 39.99,
-    "stock": 100,
+    "name": "Premium Cement (50kg)",
+    "category": "Building Materials",
+    "description": "High-quality premium cement for construction projects",
+    "price": 12.99,
+    "stock": 120,
+    "lowStockThreshold": 10,
     "soldQuantity": 0,
-    "discount": 15,
-    "unit": "Set",
-    "specifications": [ ... ],
-    "deliveryOptions": { ... },
+    "discount": 0,
+    "unit": "Bag",
+    "image": null,
+    "images": [],
+    "specifications": [
+      { "name": "Weight", "value": "50kg" },
+      { "name": "Type", "value": "Portland Cement" },
+      { "name": "Grade", "value": "53" }
+    ],
+    "deliveryOptions": {
+      "availableForDelivery": true,
+      "availableForPickup": true
+    },
+    "isActive": true,
     "createdAt": "2024-01-15T00:00:00.000Z"
   }
 }
@@ -512,7 +670,7 @@ Content-Type: application/json
 
 ---
 
-### 12. Update Product
+### 13. Update Product
 
 **Request:**
 ```http
@@ -521,12 +679,27 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "name": "Screwdriver Set Pro",
-  "price": 44.99,
-  "stock": 80,
-  "discount": 20
+  "name": "Premium Cement (50kg)",
+  "category": "Building Materials",
+  "description": "Premium quality cement suitable for all general construction purposes. High strength, consistent quality and excellent workability. Each bag contains 50kg of cement.",
+  "price": 12.99,
+  "stock": 120,
+  "discount": 0,
+  "unit": "Bag",
+  "isActive": true,
+  "specifications": [
+    { "name": "Weight", "value": "50kg" },
+    { "name": "Type", "value": "Portland Cement" },
+    { "name": "Grade", "value": "53" }
+  ],
+  "deliveryOptions": {
+    "availableForDelivery": true,
+    "availableForPickup": true
+  }
 }
 ```
+
+All fields are optional. Only send fields you want to update.
 
 **Response:**
 ```json
@@ -535,18 +708,37 @@ Content-Type: application/json
   "message": "Product updated successfully",
   "product": {
     "id": "507f1f77bcf86cd799439012",
-    "name": "Screwdriver Set Pro",
-    "price": 44.99,
-    "stock": 80,
-    "discount": 20,
-    ...
+    "name": "Premium Cement (50kg)",
+    "category": "Building Materials",
+    "description": "Premium quality cement suitable for all general construction purposes...",
+    "price": 12.99,
+    "stock": 120,
+    "discount": 0,
+    "unit": "Bag",
+    "isActive": true,
+    "specifications": [
+      { "name": "Weight", "value": "50kg" },
+      { "name": "Type", "value": "Portland Cement" },
+      { "name": "Grade", "value": "53" }
+    ],
+    "deliveryOptions": {
+      "availableForDelivery": true,
+      "availableForPickup": true
+    },
+    "image": "https://res.cloudinary.com/.../cement.jpg",
+    "images": [
+      "https://res.cloudinary.com/.../cement1.jpg",
+      "https://res.cloudinary.com/.../cement2.jpg"
+    ],
+    "createdAt": "2024-01-15T00:00:00.000Z",
+    "updatedAt": "2024-01-16T00:00:00.000Z"
   }
 }
 ```
 
 ---
 
-### 13. Delete Product
+### 14. Delete Product
 
 **Request:**
 ```http
@@ -564,7 +756,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 14. Upload Product Image (Single)
+### 15. Upload Product Image (Single)
 
 **Request:**
 ```http
@@ -572,20 +764,7 @@ POST http://localhost:3000/api/products/507f1f77bcf86cd799439012/upload-image
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**⚠️ IMPORTANT - Postman Setup Instructions:**
-
-1. **Method:** Select `POST`
-2. **URL:** Enter the endpoint URL
-3. **Headers:** 
-   - Add `Authorization: Bearer YOUR_TOKEN`
-   - **DO NOT manually add `Content-Type` header** - Postman will add it automatically with the boundary parameter
-4. **Body Tab:**
-   - Select `form-data` (NOT `raw` or `x-www-form-urlencoded`)
-   - Add a new field:
-     - **Key:** `image` (must be exactly "image")
-     - **Type:** Change from "Text" to "File" (click the dropdown next to the key)
-     - **Value:** Click "Select Files" and choose your image file
-5. **Send** the request
+**Image:** JPG, JPEG, PNG, GIF, WEBP, SVG (max 10 MB). Use form-data with field name `image`.
 
 **Response:**
 ```json
@@ -597,7 +776,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-### 15. Upload Multiple Product Images
+### 16. Upload Multiple Product Images
 
 **Request:**
 ```http
@@ -605,28 +784,7 @@ POST http://localhost:3000/api/products/507f1f77bcf86cd799439012/upload-images
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
-**⚠️ IMPORTANT - Postman Setup Instructions:**
-
-1. **Method:** Select `POST`
-2. **URL:** Enter the endpoint URL
-3. **Headers:** 
-   - Add `Authorization: Bearer YOUR_TOKEN`
-   - **DO NOT manually add `Content-Type` header** - Postman will add it automatically
-4. **Body Tab:**
-   - Select `form-data` (NOT `raw` or `x-www-form-urlencoded`)
-   - Add multiple fields, each with:
-     - **Key:** `images` (must be exactly "images" - same key for all files)
-     - **Type:** Change from "Text" to "File" (click the dropdown next to each key)
-     - **Value:** Click "Select Files" and choose your image file
-   - You can add up to 6 images total
-   - **Tip:** You can add multiple files with the same key name `images` - Postman will send them as an array
-
-**Example Postman Body Setup:**
-```
-Key: images | Type: File | Value: [Select File] image1.jpg
-Key: images | Type: File | Value: [Select File] image2.jpg
-Key: images | Type: File | Value: [Select File] image3.jpg
-```
+**Images:** JPG, JPEG, PNG, GIF, WEBP, SVG (max 10 MB each, max 6 images). Use form-data with field name `images`.
 
 **Response:**
 ```json
@@ -644,7 +802,7 @@ Key: images | Type: File | Value: [Select File] image3.jpg
 
 ---
 
-### 16. Delete Product Image
+### 17. Delete Product Image
 
 **Request:**
 ```http
@@ -663,7 +821,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 17. Get All Categories
+### 18. Get All Categories
 
 **Request:**
 ```http
@@ -689,7 +847,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## 🛒 Order APIs
 
-### 18. Get All Orders
+### 19. Get All Orders
 
 **Request:**
 ```http
@@ -707,50 +865,62 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "success": true,
+  "count": 20,
+  "total": 50,
+  "page": 1,
+  "pages": 3,
+  "statusCounts": {
+    "New Order": 5,
+    "Processing": 8,
+    "Ready": 3,
+    "Out for delivery": 2,
+    "Delivered": 2
+  },
   "orders": [
     {
       "id": "507f1f77bcf86cd799439013",
-      "orderNumber": "ORD-2024-001",
-      "customerName": "Jane Smith",
-      "customerEmail": "jane@example.com",
+      "orderNumber": "INS5785",
+      "customerName": "John Doe",
+      "customerNameShort": "John D.",
+      "customerEmail": "john@example.com",
       "customerPhone": "555-1234",
       "status": "New Order",
-      "customerType": "Contractor",
+      "totalAmount": 45.97,
+      "itemsCount": 2,
+      "timeAgo": "30 min ago",
+      "createdAt": "2024-01-15T10:11:00.000Z",
       "items": [
         {
+          "id": "507f1f77bcf86cd799439014",
           "productId": "507f1f77bcf86cd799439011",
-          "productName": "Hammer",
+          "productName": "Premium Cement (50kg)",
           "quantity": 2,
-          "price": 25.99
+          "price": 12.99,
+          "subtotal": 25.98,
+          "productImage": "https://res.cloudinary.com/.../cement.jpg"
+        },
+        {
+          "id": "507f1f77bcf86cd799439015",
+          "productId": "507f1f77bcf86cd799439012",
+          "productName": "LED Light Bulbs (5pk)",
+          "quantity": 1,
+          "price": 19.99,
+          "subtotal": 19.99,
+          "productImage": "https://res.cloudinary.com/.../bulbs.jpg"
         }
       ],
-      "subtotal": 51.98,
-      "tax": 4.16,
-      "shipping": 5.00,
-      "totalAmount": 61.14,
-      "createdAt": "2024-01-15T00:00:00.000Z"
+      "deliveryMethod": "Standard Delivery",
+      "deliveryAddress": "123 Main St, City, State",
+      "customerType": "Contractor"
     }
-  ],
-  "pagination": {
-    "currentPage": 1,
-    "totalPages": 3,
-    "totalOrders": 50,
-    "hasNext": true,
-    "hasPrev": false
-  },
-  "statusCounts": {
-    "All": 50,
-    "New Order": 10,
-    "Processing": 15,
-    "Ready": 5,
-    "Completed": 20
-  }
+  ]
 }
 ```
 
+
 ---
 
-### 19. Get Recent Orders
+### 20. Get Recent Orders
 
 **Request:**
 ```http
@@ -762,14 +932,27 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "success": true,
+  "count": 5,
   "orders": [
     {
       "id": "507f1f77bcf86cd799439013",
-      "orderNumber": "ORD-2024-001",
-      "customerName": "Jane Smith",
+      "orderNumber": "INS5785",
+      "customerName": "John Doe",
+      "customerNameShort": "John D.",
       "status": "New Order",
-      "totalAmount": 61.14,
-      "createdAt": "2024-01-15T00:00:00.000Z"
+      "totalAmount": 45.97,
+      "itemsCount": 2,
+      "timeAgo": "30 min ago",
+      "createdAt": "2024-01-15T10:11:00.000Z",
+      "items": [
+        {
+          "productName": "Premium Cement (50kg)",
+          "quantity": 2,
+          "price": 12.99,
+          "subtotal": 25.98,
+          "productImage": "https://res.cloudinary.com/.../cement.jpg"
+        }
+      ]
     }
   ]
 }
@@ -777,7 +960,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 20. Get Single Order
+### 21. Get Single Order
 
 **Request:**
 ```http
@@ -791,25 +974,78 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
   "success": true,
   "order": {
     "id": "507f1f77bcf86cd799439013",
-    "orderNumber": "ORD-2024-001",
-    "customerName": "Jane Smith",
-    "customerEmail": "jane@example.com",
-    "customerPhone": "555-1234",
-    "status": "New Order",
+    "orderNumber": "INS5785",
+    "customerName": "John Doe",
+    "customerNameShort": "John D.",
+    "customerInitials": "JD",
+    "customerEmail": "john@example.com",
+    "customerPhone": "+1 (555) 123-4567",
+    "status": "Processing",
+    "totalAmount": 45.97,
+    "itemsCount": 3,
+    "timeAgo": "2 hours ago",
+    "lastUpdated": "March 15, 2025 • 10:30 AM",
+    "lastUpdatedStatus": "Processing",
+    "deliveryMethod": "Standard Delivery",
+    "deliveryAddress": {
+      "name": "John's Construction Site",
+      "street": "123 Builder St",
+      "city": "Springfield",
+      "state": "IL",
+      "zipCode": "62701",
+      "country": "United States",
+      "fullAddress": "123 Builder St, Springfield, IL 62701"
+    },
+    "deliveryAddressName": "John's Construction Site",
+    "deliveryAddressFull": "123 Builder St, Springfield, IL 62701",
+    "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+    "paymentMethod": {
+      "type": "Credit Card",
+      "last4": "4582",
+      "brand": "Visa"
+    },
+    "paymentMethodDisplay": "Credit Card •••• 4582",
     "customerType": "Contractor",
-    "items": [ ... ],
-    "subtotal": 51.98,
-    "tax": 4.16,
-    "shipping": 5.00,
-    "totalAmount": 61.14,
-    "createdAt": "2024-01-15T00:00:00.000Z"
+    "notes": "",
+    "items": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "productId": "507f1f77bcf86cd799439010",
+        "productName": "Premium Cement (50kg)",
+        "quantity": 2,
+        "price": 12.99,
+        "subtotal": 25.98,
+        "productImage": "https://res.cloudinary.com/.../cement.jpg"
+      }
+    ],
+    "orderHistory": [
+      {
+        "status": "Processing",
+        "statusLabel": "Processing",
+        "note": "Order is being prepared for shipment",
+        "updatedBy": "Urban Supply Co.",
+        "timestamp": "2025-03-15T10:30:00.000Z",
+        "formattedDate": "March 15, 2025 • 10:30 AM"
+      },
+      {
+        "status": "New Order",
+        "statusLabel": "New Order",
+        "note": "New order received from John Doe with 3 items totaling $45.97.",
+        "updatedBy": "System",
+        "timestamp": "2025-03-15T10:28:00.000Z",
+        "formattedDate": "March 15, 2025 • 10:28 AM"
+      }
+    ],
+    "createdAt": "2025-03-15T10:28:00.000Z",
+    "updatedAt": "2025-03-15T10:30:00.000Z"
   }
 }
 ```
 
+
 ---
 
-### 21. Create Order
+### 22. Create Order
 
 **Request:**
 ```http
@@ -818,39 +1054,36 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "customerName": "Jane Smith",
-  "customerEmail": "jane@example.com",
-  "customerPhone": "555-1234",
+  "customerName": "John Doe",
+  "customerEmail": "john@example.com",
+  "customerPhone": "+1 (555) 123-4567",
   "customerType": "Contractor",
   "items": [
     {
       "productId": "69160f0a2f6b77274a2eceaf",
       "quantity": 2
     }
-  ]
+  ],
+  "deliveryAddress": {
+    "name": "John's Construction Site",
+    "street": "123 Builder St",
+    "city": "Springfield",
+    "state": "IL",
+    "zipCode": "62701",
+    "country": "United States"
+  },
+  "deliveryMethod": "Standard Delivery",
+  "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+  "paymentMethod": {
+    "type": "Credit Card",
+    "last4": "4582",
+    "brand": "Visa"
+  },
+  "notes": "Please deliver to the construction site entrance"
 }
 ```
 
-**Important Notes:**
-1. **Use a real product ID** that belongs to your logged-in supplier account
-2. **Only send `productId` and `quantity`** - the API will automatically:
-   - Fetch product details (name, price) from the database
-   - Calculate subtotals and total amount
-   - Validate stock availability
-3. **Do NOT send `productName` or `price`** - these are ignored and fetched from the database
-4. **Do NOT send `subtotal`, `tax`, `shipping`, or `totalAmount`** - these are calculated automatically
-5. The API validates:
-   - Product exists and belongs to your account
-   - Product is active
-   - Sufficient stock available
-   - Valid product ID format
-
-**Optional Fields:**
-- `deliveryAddress` - Delivery address
-- `deliveryMethod` - "Standard Delivery", "Express Delivery", or "Pickup" (default: "Standard Delivery")
-- `deliveryTime` - Delivery time slot
-- `paymentMethod` - Payment method object
-- `notes` - Order notes
+Only send `productId` and `quantity`. Product details are fetched automatically.
 
 **Response:**
 ```json
@@ -859,18 +1092,46 @@ Content-Type: application/json
   "message": "Order created successfully",
   "order": {
     "id": "507f1f77bcf86cd799439013",
-    "orderNumber": "ORD-2024-001",
-    "customerName": "Jane Smith",
+    "orderNumber": "INS5785",
+    "customerName": "John Doe",
+    "customerInitials": "JD",
     "status": "New Order",
-    "totalAmount": 61.14,
-    "createdAt": "2024-01-15T00:00:00.000Z"
+    "totalAmount": 45.97,
+    "itemsCount": 3,
+    "deliveryAddress": {
+      "name": "John's Construction Site",
+      "street": "123 Builder St",
+      "city": "Springfield",
+      "state": "IL",
+      "zipCode": "62701",
+      "country": "United States",
+      "fullAddress": "123 Builder St, Springfield, IL 62701"
+    },
+    "deliveryMethod": "Standard Delivery",
+    "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+    "paymentMethod": {
+      "type": "Credit Card",
+      "last4": "4582",
+      "brand": "Visa"
+    },
+    "orderHistory": [
+      {
+        "status": "New Order",
+        "statusLabel": "New Order",
+        "note": "New order received from John Doe with 3 items totaling $45.97.",
+        "updatedBy": "System",
+        "timestamp": "2025-03-15T10:28:00.000Z",
+        "formattedDate": "March 15, 2025 • 10:28 AM"
+      }
+    ],
+    "createdAt": "2025-03-15T10:28:00.000Z"
   }
 }
 ```
 
 ---
 
-### 22. Update Order Status
+### 23. Update Order Status
 
 **Request:**
 ```http
@@ -879,9 +1140,13 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "status": "Processing"
+  "status": "Processing",
+  "note": "Order is being prepared for shipment"
 }
 ```
+
+**Required:** `status`  
+**Optional:** `note`
 
 **Response:**
 ```json
@@ -890,15 +1155,44 @@ Content-Type: application/json
   "message": "Order status updated successfully",
   "order": {
     "id": "507f1f77bcf86cd799439013",
+    "orderNumber": "INS5785",
     "status": "Processing",
+    "lastUpdated": "March 15, 2025 • 10:30 AM",
+    "lastUpdatedStatus": "Processing",
+    "orderHistory": [
+      {
+        "status": "Processing",
+        "statusLabel": "Processing",
+        "note": "Order is being prepared for shipment",
+        "updatedBy": "Urban Supply Co.",
+        "timestamp": "2025-03-15T10:30:00.000Z",
+        "formattedDate": "March 15, 2025 • 10:30 AM"
+      },
+      {
+        "status": "New Order",
+        "statusLabel": "New Order",
+        "note": "New order received from John Doe with 3 items totaling $45.97.",
+        "updatedBy": "System",
+        "timestamp": "2025-03-15T10:28:00.000Z",
+        "formattedDate": "March 15, 2025 • 10:28 AM"
+      }
+    ],
+    "customerName": "John Doe",
+    "customerInitials": "JD",
+    "customerPhone": "+1 (555) 123-4567",
+    "deliveryAddressName": "John's Construction Site",
+    "deliveryAddressFull": "123 Builder St, Springfield, IL 62701",
+    "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+    "paymentMethodDisplay": "Credit Card •••• 4582",
     ...
   }
 }
 ```
 
+
 ---
 
-### 23. Update Order
+### 24. Update Order
 
 **Request:**
 ```http
@@ -907,23 +1201,60 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 Content-Type: application/json
 
 {
-  "customerName": "Jane Doe",
-  "customerPhone": "555-5678"
+  "customerName": "John Doe",
+  "customerPhone": "+1 (555) 123-4567",
+  "deliveryAddress": {
+    "name": "John's Construction Site",
+    "street": "123 Builder St",
+    "city": "Springfield",
+    "state": "IL",
+    "zipCode": "62701",
+    "country": "United States"
+  },
+  "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+  "paymentMethod": {
+    "type": "Credit Card",
+    "last4": "4582",
+    "brand": "Visa"
+  },
+  "notes": "Please deliver to the construction site entrance"
 }
 ```
+
+All fields are optional. Partial updates supported.
 
 **Response:**
 ```json
 {
   "success": true,
   "message": "Order updated successfully",
-  "order": { ... }
+  "order": {
+    "id": "507f1f77bcf86cd799439013",
+    "orderNumber": "INS5785",
+    "customerName": "John Doe",
+    "customerInitials": "JD",
+    "deliveryAddress": {
+      "name": "John's Construction Site",
+      "street": "123 Builder St",
+      "city": "Springfield",
+      "state": "IL",
+      "zipCode": "62701",
+      "country": "United States",
+      "fullAddress": "123 Builder St, Springfield, IL 62701"
+    },
+    "deliveryAddressName": "John's Construction Site",
+    "deliveryAddressFull": "123 Builder St, Springfield, IL 62701",
+    "deliveryTime": "Today, 2:00 PM - 4:00 PM",
+    "paymentMethodDisplay": "Credit Card •••• 4582",
+    "orderHistory": [ ... ],
+    ...
+  }
 }
 ```
 
 ---
 
-### 24. Delete Order
+### 25. Delete Order
 
 **Request:**
 ```http
@@ -943,7 +1274,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## 📊 Dashboard APIs
 
-### 25. Get Dashboard Summary
+### 26. Get Dashboard Summary
 
 **Request:**
 ```http
@@ -955,26 +1286,254 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "success": true,
-  "dashboard": {
-    "totalSales": 15000.50,
-    "totalOrders": 150,
-    "averageRating": 4.5,
-    "storeStatus": "Open",
-    "recentOrders": [ ... ],
-    "lowStockProducts": [ ... ]
+  "data": {
+    "currentDate": "Tuesday, March 15, 2025",
+    "todaySales": {
+      "amount": "1254.00",
+      "change": 12,
+      "changeType": "increase"
+    },
+    "orders": {
+      "count": 32,
+      "change": 8,
+      "changeType": "increase"
+    },
+    "rating": {
+      "value": "4.8",
+      "count": 125
+    },
+    "storeStatus": {
+      "isOpen": true,
+      "closingTime": "21:00",
+      "message": "Until 21:00"
+    },
+    "recentOrders": [
+      {
+        "id": "507f1f77bcf86cd799439013",
+        "orderNumber": "INS4304",
+        "itemsCount": 3,
+        "totalAmount": 89.97,
+        "status": "Needs confirmation",
+        "customerName": "John Doe",
+        "createdAt": "2024-01-15T00:00:00.000Z",
+        "items": [
+          {
+            "id": "507f1f77bcf86cd799439011",
+            "name": "Premium Cement",
+            "quantity": 2,
+            "price": 12.99,
+            "subtotal": 25.98,
+            "image": "https://res.cloudinary.com/..."
+          }
+        ]
+      }
+    ]
   }
+}
+```
+
+
+---
+
+### 26. Get KPIs (Key Performance Indicators)
+
+**Request:**
+```http
+GET http://localhost:3000/api/dashboard/kpis
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "totalSales": {
+      "value": 8245.50,
+      "change": 18,
+      "changeType": "increase"
+    },
+    "totalOrders": {
+      "value": 142,
+      "change": 12,
+      "changeType": "increase"
+    },
+    "avgOrderValue": {
+      "value": 58.07,
+      "change": 5,
+      "changeType": "increase"
+    },
+    "newCustomers": {
+      "value": 28,
+      "change": -3,
+      "changeType": "decrease"
+    }
+  }
+}
+```
+
+
+---
+
+### 27. Get Sales Overview Graph Data
+
+**Request:**
+```http
+GET http://localhost:3000/api/dashboard/sales-overview?period=daily
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Query Parameters:**
+- `period` - Time period: "daily" (default), "weekly", or "monthly"
+
+**Response (Daily):**
+```json
+{
+  "success": true,
+  "period": "daily",
+  "data": [
+    { "label": "Sun", "value": 1800.00 },
+    { "label": "Mon", "value": 1200.00 },
+    { "label": "Tue", "value": 1900.00 },
+    { "label": "Wed", "value": 800.00 },
+    { "label": "Thu", "value": 1400.00 },
+    { "label": "Fri", "value": 2000.00 },
+    { "label": "Sat", "value": 1300.00 }
+  ]
+}
+```
+
+**Response (Weekly):**
+```json
+{
+  "success": true,
+  "period": "weekly",
+  "data": [
+    { "label": "Week Jan 1", "value": 5200.00 },
+    { "label": "Week Jan 8", "value": 6800.00 },
+    { "label": "Week Jan 15", "value": 7500.00 },
+    { "label": "Week Jan 22", "value": 8200.00 }
+  ]
+}
+```
+
+**Response (Monthly):**
+```json
+{
+  "success": true,
+  "period": "monthly",
+  "data": [
+    { "label": "Jan 2024", "value": 25000.00 },
+    { "label": "Feb 2024", "value": 28000.00 },
+    { "label": "Mar 2024", "value": 32000.00 }
+  ]
 }
 ```
 
 ---
 
-**Note:** Additional dashboard endpoints (KPIs, Sales Overview, Top Products, Customer Demographics) are available in the analytics endpoint response.
+### 28. Get Top Products
+
+**Request:**
+```http
+GET http://localhost:3000/api/dashboard/top-products?limit=10&sortBy=revenue
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Query Parameters:**
+- `limit` - Number of products to return (default: 10)
+- `sortBy` - Sort by "revenue" (default) or "units"
+
+**Response:**
+```json
+{
+  "success": true,
+  "sortBy": "revenue",
+  "count": 4,
+  "products": [
+    {
+      "rank": 1,
+      "productId": "507f1f77bcf86cd799439011",
+      "productName": "Power Drill Set (18V)",
+      "productImage": "https://res.cloudinary.com/.../drill.jpg",
+      "unitsSold": 32,
+      "revenue": 2879.68
+    },
+    {
+      "rank": 2,
+      "productId": "507f1f77bcf86cd799439012",
+      "productName": "Premium Cement (50kg)",
+      "productImage": "https://res.cloudinary.com/.../cement.jpg",
+      "unitsSold": 45,
+      "revenue": 579.68
+    },
+    {
+      "rank": 3,
+      "productId": "507f1f77bcf86cd799439013",
+      "productName": "Copper Pipes (10pcs)",
+      "productImage": "https://res.cloudinary.com/.../pipes.jpg",
+      "unitsSold": 18,
+      "revenue": 621.00
+    },
+    {
+      "rank": 4,
+      "productId": "507f1f77bcf86cd799439014",
+      "productName": "LED Light Bulbs (5pk)",
+      "productImage": "https://res.cloudinary.com/.../bulbs.jpg",
+      "unitsSold": 27,
+      "revenue": 539.73
+    }
+  ]
+}
+```
+
+
+---
+
+### 29. Get Customer Demographics
+
+**Request:**
+```http
+GET http://localhost:3000/api/dashboard/customer-demographics
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "total": 150,
+  "demographics": [
+    {
+      "type": "Contractor",
+      "count": 75,
+      "percentage": 50.0
+    },
+    {
+      "type": "DIY Homeowner",
+      "count": 45,
+      "percentage": 30.0
+    },
+    {
+      "type": "Business",
+      "count": 20,
+      "percentage": 13.3
+    },
+    {
+      "type": "Other",
+      "count": 10,
+      "percentage": 6.7
+    }
+  ]
+}
+```
+
 
 ---
 
 ## 🏪 Store Settings APIs
 
-### 26. Get Store Settings
+### 30. Get Store Settings
 
 **Request:**
 ```http
@@ -999,7 +1558,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ---
 
-### 27. Update Store Settings
+### 31. Update Store Settings
 
 **Request:**
 ```http
@@ -1029,7 +1588,7 @@ Content-Type: application/json
 
 ## ⭐ Review APIs
 
-### 28. Get All Reviews
+### 32. Get All Reviews
 
 **Request:**
 ```http
@@ -1047,29 +1606,61 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "success": true,
+  "count": 20,
+  "total": 124,
+  "page": 1,
+  "pages": 7,
+  "ratingDistribution": {
+    "5": 85,
+    "4": 12,
+    "3": 2,
+    "2": 1,
+    "1": 0
+  },
   "reviews": [
     {
       "id": "507f1f77bcf86cd799439014",
-      "productId": "507f1f77bcf86cd799439011",
-      "productName": "Hammer",
-      "customerName": "John Customer",
+      "customerName": "John D.",
+      "customerInitials": "JD",
+      "customerEmail": "john@example.com",
       "rating": 5,
-      "comment": "Great product!",
-      "images": ["https://res.cloudinary.com/.../review1.jpg"],
-      "companyReply": {
-        "message": "Thank you for your feedback!",
-        "repliedAt": "2024-01-15T00:00:00.000Z"
+      "reviewText": "Great quality products and super fast delivery! I ordered some cement bags and they arrived within hours. The staff was also very helpful with loading them into my truck. Will definitely order again.",
+      "images": [
+        "https://res.cloudinary.com/.../cement1.jpg"
+      ],
+      "imagesCount": 3,
+      "timeAgo": "2 days ago",
+      "createdAt": "2024-01-15T00:00:00.000Z",
+      "reply": null,
+      "hasReply": false
+    },
+    {
+      "id": "507f1f77bcf86cd799439015",
+      "customerName": "Sarah M.",
+      "customerInitials": "SM",
+      "customerEmail": "sarah@example.com",
+      "rating": 4,
+      "reviewText": "The power drill I ordered works great! Shipping was fast and the product came well-packaged. Only giving 4 stars because the battery doesn't seem to last as long as advertised.",
+      "images": [],
+      "imagesCount": 0,
+      "timeAgo": "1 week ago",
+      "createdAt": "2024-01-08T00:00:00.000Z",
+      "reply": {
+        "companyName": "Urban Supply Co.",
+        "replyText": "Thank you for your feedback, Sarah! We're sorry to hear about the battery life. Please contact our customer service and we'll be happy to check if there might be an issue with the battery.",
+        "timeAgo": "6 days ago",
+        "createdAt": "2024-01-09T00:00:00.000Z"
       },
-      "createdAt": "2024-01-15T00:00:00.000Z"
+      "hasReply": true
     }
-  ],
-  "pagination": { ... }
+  ]
 }
 ```
 
+
 ---
 
-### 29. Get Review Summary
+### 33. Get Review Summary
 
 **Request:**
 ```http
@@ -1082,26 +1673,26 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 {
   "success": true,
   "summary": {
-    "totalReviews": 100,
-    "averageRating": 4.5,
+    "averageRating": 4.9,
+    "totalReviews": 124,
     "ratingDistribution": {
-      "5": 60,
-      "4": 25,
-      "3": 10,
-      "2": 3,
-      "1": 2
-    }
+      "5": 85,
+      "4": 12,
+      "3": 2,
+      "2": 1,
+      "1": 0
+    },
+    "topPercentage": "Top 5%"
   }
 }
 ```
 
+
 ---
 
-### 30. Create Review (Supplier-Based)
+### 34. Create Review
 
-**⚠️ IMPORTANT:** Reviews are for **suppliers/stores**, NOT individual products. A customer reviews the entire supplier experience.
-
-**Request (Without Images):**
+**Request (Without Images - JSON):**
 ```http
 POST http://localhost:3000/api/reviews
 Content-Type: application/json
@@ -1115,68 +1706,90 @@ Content-Type: application/json
 }
 ```
 
-**Note:** You can use any of these field names for the review comment text:
-- `comment` (recommended)
-- `reviewText`
-- `replyText`
-
-All of these will be saved as `reviewText` in the database.
-
-**Request (With Images - Use form-data in Postman):**
+**Request (With Images - Use form-data):**
 ```http
 POST http://localhost:3000/api/reviews
 Content-Type: multipart/form-data
 ```
 
-**⚠️ Postman Setup for Review with Images:**
+**Required:** `supplierId`, `customerName`, `rating`  
+**Optional:** `customerEmail`, `comment` (or `reviewText`), `images` (max 5, JPG/JPEG/PNG/GIF/WEBP/SVG, 10 MB each)
 
-1. **Method:** Select `POST`
-2. **URL:** Enter the endpoint URL
-3. **Body Tab:**
-   - Select `form-data` (NOT `raw` JSON)
-   - Add these fields:
-     - **Key:** `supplierId` | **Type:** Text | **Value:** `507f1f77bcf86cd799439011`
-     - **Key:** `customerName` | **Type:** Text | **Value:** `John Customer`
-     - **Key:** `customerEmail` | **Type:** Text | **Value:** `john@example.com` (optional)
-     - **Key:** `rating` | **Type:** Text | **Value:** `5`
-     - **Key:** `comment` | **Type:** Text | **Value:** `Excellent service!`
-     - **Key:** `images` | **Type:** File | **Value:** [Select File] image1.jpg
-     - **Key:** `images` | **Type:** File | **Value:** [Select File] image2.jpg
-     - (You can add up to 5 images with the same key name `images`)
-
-**Response:**
+**Response (Without Images):**
 ```json
 {
   "success": true,
   "message": "Review created successfully",
   "review": {
-    "_id": "507f1f77bcf86cd799439014",
+    "id": "507f1f77bcf86cd799439014",
+    "supplier": "507f1f77bcf86cd799439011",
+    "customerName": "John Customer",
+    "customerEmail": "john@example.com",
+    "rating": 5,
+    "reviewText": "Excellent service and quality products! Highly recommend this supplier.",
+    "images": [],
+    "createdAt": "2024-01-15T00:00:00.000Z"
+  }
+}
+```
+
+**Response (With Images):**
+```json
+{
+  "success": true,
+  "message": "Review created successfully",
+  "review": {
+    "id": "507f1f77bcf86cd799439014",
     "supplier": "507f1f77bcf86cd799439011",
     "customerName": "John Customer",
     "customerEmail": "john@example.com",
     "rating": 5,
     "reviewText": "Excellent service and quality products! Highly recommend this supplier.",
     "images": [
-      "https://res.cloudinary.com/.../image1.jpg",
-      "https://res.cloudinary.com/.../image2.jpg"
+      "https://res.cloudinary.com/.../review1.jpg",
+      "https://res.cloudinary.com/.../review2.jpg"
     ],
-    "isVisible": true,
-    "createdAt": "2024-01-15T00:00:00.000Z",
-    "updatedAt": "2024-01-15T00:00:00.000Z"
+    "createdAt": "2024-01-15T00:00:00.000Z"
   }
 }
 ```
 
-**Note:** 
-- Reviews are **supplier-based**, not product-based
-- `supplierId` is the ID of the supplier/store being reviewed
-- Images are optional (up to 5 images)
-- Rating must be between 1 and 5
-- No authentication required - customers can review suppliers publicly
 
 ---
 
-### 31. Add Reply to Review
+### 34.1. Upload Review Images (After Creation)
+
+**Request:**
+```http
+POST http://localhost:3000/api/reviews/507f1f77bcf86cd799439014/upload-images
+Content-Type: multipart/form-data
+```
+
+**Images:** JPG, JPEG, PNG, GIF, WEBP, SVG (max 10 MB each, max 5 images). Use form-data with field name `images`.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Images uploaded successfully",
+  "images": [
+    "https://res.cloudinary.com/.../review1.jpg",
+    "https://res.cloudinary.com/.../review2.jpg"
+  ],
+  "review": {
+    "id": "507f1f77bcf86cd799439014",
+    "images": [
+      "https://res.cloudinary.com/.../review1.jpg",
+      "https://res.cloudinary.com/.../review2.jpg"
+    ],
+    ...
+  }
+}
+```
+
+---
+
+### 35. Add Reply to Review
 
 **Request:**
 ```http
@@ -1190,14 +1803,7 @@ Content-Type: application/json
 }
 ```
 
-**Note:** You can use either `replyText` or `message` field. `companyName` is optional - if not provided, it will use the supplier's name.
-
-**Alternative Request (using "message"):**
-```json
-{
-  "message": "Thank you for your feedback! We're glad you're happy with our service."
-}
-```
+Use `replyText` or `message`. `companyName` is optional.
 
 **Response:**
 ```json
@@ -1224,41 +1830,67 @@ Content-Type: application/json
 
 ## 🎯 Campaign APIs
 
-### 32. Get All Campaigns
+### 36. Get All Campaigns
 
 **Request:**
 ```http
-GET http://localhost:3000/api/campaigns?status=active&page=1&limit=20
+GET http://localhost:3000/api/campaigns?status=Active&page=1&limit=20
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+**Query Parameters:**
+- `status` - Filter by status (Active, Paused, Completed, Cancelled, or "All" for all)
+- `page` - Page number
+- `limit` - Items per page
 
 **Response:**
 ```json
 {
   "success": true,
+  "count": 2,
+  "total": 2,
+  "page": 1,
+  "pages": 1,
+  "summary": {
+    "activeCampaigns": 2,
+    "totalBudgetSpent": 38.50
+  },
   "campaigns": [
     {
-      "id": "507f1f77bcf86cd799439015",
-      "name": "Summer Sale",
-      "description": "20% off all tools",
-      "status": "active",
-      "startDate": "2024-06-01",
-      "endDate": "2024-08-31",
-      "products": ["507f1f77bcf86cd799439011"],
-      "metrics": {
-        "views": 1000,
-        "clicks": 200,
-        "conversions": 50
-      }
+      "id": "507f1f77bcf86cd799439020",
+      "name": "Summer Building Materials",
+      "status": "Active",
+      "dailyBudget": 10.00,
+      "impressions": 2458,
+      "clicks": 154,
+      "totalBudgetSpent": 38.50,
+      "productImages": [
+        "https://res.cloudinary.com/.../product1.jpg",
+        "https://res.cloudinary.com/.../product2.jpg",
+        "https://res.cloudinary.com/.../product3.jpg"
+      ],
+      "productsCount": 3,
+      "products": [
+        {
+          "id": "507f1f77bcf86cd799439011",
+          "name": "Premium Cement (50kg)",
+          "image": "https://res.cloudinary.com/.../cement.jpg",
+          "price": 12.99,
+          "category": "Building Materials"
+        }
+      ],
+      "startDate": "2024-01-15T00:00:00.000Z",
+      "endDate": null,
+      "createdAt": "2024-01-15T00:00:00.000Z"
     }
-  ],
-  "pagination": { ... }
+  ]
 }
 ```
 
+
 ---
 
-### 33. Create Campaign
+### 37. Create Campaign
 
 **Request:**
 ```http
@@ -1275,19 +1907,8 @@ Content-Type: application/json
 }
 ```
 
-**Required Fields:**
-- `name` - Campaign name
-- `products` - Array of product IDs (at least one product required)
-- `dailyBudget` - Daily budget amount (must be greater than 0)
-
-**Optional Fields:**
-- `startDate` - Campaign start date (defaults to current date if not provided)
-- `endDate` - Campaign end date (optional)
-
-**Note:** 
-- `status` is automatically set to "Active" when creating a campaign
-- All products must belong to the authenticated supplier
-- `dailyBudget` must be a positive number
+**Required:** `name`, `products` (array), `dailyBudget`  
+**Optional:** `startDate`, `endDate`
 
 **Response:**
 ```json
@@ -1320,19 +1941,288 @@ Content-Type: application/json
 
 ---
 
-## 🔔 Notification APIs
-
-### 34. Get All Notifications
+### 37.1. Get Top Ranking Products
 
 **Request:**
 ```http
-GET http://localhost:3000/api/notifications?type=order&read=false&page=1&limit=20
+GET http://localhost:3000/api/campaigns/top-ranking?limit=10
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 **Query Parameters:**
-- `type` - Filter by type (order, alert, system)
-- `read` - Filter by read status (true/false)
+- `limit` - Number of products to return (default: 10)
+
+**Response:**
+```json
+{
+  "success": true,
+  "count": 3,
+  "products": [
+    {
+      "id": "507f1f77bcf86cd799439011",
+      "rank": 1,
+      "productName": "Power Drill Set (18V)",
+      "productImage": "https://res.cloudinary.com/.../drill.jpg",
+      "category": "Tools",
+      "price": 89.99,
+      "rankingTags": ["Top Rated", "Promoted"],
+      "positionText": "1st in Tools",
+      "soldQuantity": 245
+    },
+    {
+      "id": "507f1f77bcf86cd799439012",
+      "rank": 2,
+      "productName": "Premium Cement (50kg)",
+      "productImage": "https://res.cloudinary.com/.../cement.jpg",
+      "category": "Building Materials",
+      "price": 12.99,
+      "rankingTags": ["Best Seller", "Promoted"],
+      "positionText": "2nd in Building Materials",
+      "soldQuantity": 180
+    },
+    {
+      "id": "507f1f77bcf86cd799439013",
+      "rank": 5,
+      "productName": "Copper Pipes (10pcs)",
+      "productImage": "https://res.cloudinary.com/.../pipes.jpg",
+      "category": "Plumbing",
+      "price": 34.50,
+      "rankingTags": ["Popular"],
+      "positionText": "5th in Plumbing",
+      "soldQuantity": 92
+    }
+  ]
+}
+```
+
+
+---
+
+### 37.2. Boost Product Ranking
+
+**Request:**
+```http
+POST http://localhost:3000/api/campaigns/boost-ranking
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "productId": "507f1f77bcf86cd799439011",
+  "category": "Tools",
+  "tags": ["Top Rated", "Promoted"]
+}
+```
+
+**Required:** `productId`  
+**Optional:** `category`, `tags`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Product ranking boosted successfully",
+  "product": {
+    "id": "507f1f77bcf86cd799439011",
+    "name": "Power Drill Set (18V)",
+    "ranking": {
+      "position": 1,
+      "category": "Tools",
+      "tags": ["Top Rated", "Promoted"]
+    }
+  }
+}
+```
+
+---
+
+### 37.3. Get Campaign Insights
+
+**Request:**
+```http
+GET http://localhost:3000/api/campaigns/507f1f77bcf86cd799439020/insights?period=7days
+
+or
+
+http://localhost:3000/api/campaigns?status=Active
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Query Parameters:**
+- `period` - Time period for daily performance (7days, 14days, 30days) - default: 7days
+
+**Response:**
+```json
+{
+  "success": true,
+  "campaign": {
+    "id": "507f1f77bcf86cd799439020",
+    "name": "Summer Building Materials",
+    "status": "Active",
+    "startDate": "2025-03-01T00:00:00.000Z",
+    "startDateFormatted": "Mar 1, 2025",
+    "endDate": "2025-03-30T00:00:00.000Z",
+    "endDateFormatted": "Mar 30, 2025",
+    "dailyBudget": 10.00,
+    "products": [
+      {
+        "id": "507f1f77bcf86cd799439011",
+        "name": "Premium Cement (50kg)",
+        "image": "https://res.cloudinary.com/.../cement.jpg",
+        "price": 12.99,
+        "category": "Building Materials"
+      }
+    ],
+    "productImages": [
+      "https://res.cloudinary.com/.../product1.jpg",
+      "https://res.cloudinary.com/.../product2.jpg",
+      "https://res.cloudinary.com/.../product3.jpg"
+    ]
+  },
+  "overallPerformance": {
+    "impressions": {
+      "value": 2458,
+      "change": 12,
+      "changeType": "increase",
+      "changeLabel": "12% vs. last week"
+    },
+    "clicks": {
+      "value": 154,
+      "change": 8,
+      "changeType": "increase",
+      "changeLabel": "8% vs. last week"
+    },
+    "ctr": 6.3,
+    "cpc": 0.25,
+    "totalSpend": 38.50
+  },
+  "dailyPerformance": {
+    "period": "7days",
+    "periodLabel": "Last 7 Days",
+    "data": [
+      {
+        "label": "Mon",
+        "date": "2025-03-10",
+        "impressions": 390,
+        "clicks": 26
+      },
+      {
+        "label": "Tue",
+        "date": "2025-03-11",
+        "impressions": 410,
+        "clicks": 28
+      },
+      {
+        "label": "Wed",
+        "date": "2025-03-12",
+        "impressions": 430,
+        "clicks": 29
+      },
+      {
+        "label": "Thu",
+        "date": "2025-03-13",
+        "impressions": 450,
+        "clicks": 30
+      },
+      {
+        "label": "Fri",
+        "date": "2025-03-14",
+        "impressions": 445,
+        "clicks": 29
+      },
+      {
+        "label": "Sat",
+        "date": "2025-03-15",
+        "impressions": 380,
+        "clicks": 24
+      },
+      {
+        "label": "Sun",
+        "date": "2025-03-16",
+        "impressions": 373,
+        "clicks": 23
+      }
+    ]
+  },
+  "productPerformance": [
+    {
+      "product": {
+        "id": "507f1f77bcf86cd799439011",
+        "name": "Power Drill Set (18V)",
+        "image": "https://res.cloudinary.com/.../drill.jpg",
+        "category": "Building Materials",
+        "price": 12.99
+      },
+      "salesIncrease": "+32%",
+      "salesIncreaseValue": 32,
+      "impressions": 845,
+      "clicks": 62,
+      "ctr": 7.3
+    },
+    {
+      "product": {
+        "id": "507f1f77bcf86cd799439012",
+        "name": "Poland Cement (40kg)",
+        "image": "https://res.cloudinary.com/.../cement.jpg",
+        "category": "Building Materials",
+        "price": 11.99
+      },
+      "salesIncrease": "+18%",
+      "salesIncreaseValue": 18,
+      "impressions": 635,
+      "clicks": 41,
+      "ctr": 6.5
+    },
+    {
+      "product": {
+        "id": "507f1f77bcf86cd799439013",
+        "name": "White Cement (20kg)",
+        "image": "https://res.cloudinary.com/.../white-cement.jpg",
+        "category": "Building Materials",
+        "price": 18.99
+      },
+      "salesIncrease": "+24%",
+      "salesIncreaseValue": 24,
+      "impressions": 542,
+      "clicks": 32,
+      "ctr": 5.9
+    }
+  ],
+  "recommendations": [
+    {
+      "type": "increase_budget",
+      "icon": "lightbulb",
+      "message": "Your campaign has a high CTR (6.3%). Consider increasing your daily budget to reach more customers."
+    },
+    {
+      "type": "add_products",
+      "icon": "location",
+      "message": "You could increase visibility by adding complementary products like sand or gravel to this campaign."
+    },
+    {
+      "type": "extend_campaign",
+      "icon": "clock",
+      "message": "This campaign is performing well. Consider extending it beyond Mar 30, 2025 for continued sales growth."
+    }
+  ]
+}
+```
+
+
+---
+
+## 🔔 Notification APIs
+
+### 38. Get All Notifications
+
+**Request:**
+```http
+GET http://localhost:3000/api/notifications?type=Order&isRead=false&page=1&limit=50
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+**Query Parameters:**
+- `type` - Filter by type (Order, Product, Campaign, Review, Payment, System, or "All" for all types)
+- `isRead` - Filter by read status (true/false)
 - `page` - Page number
 - `limit` - Items per page
 
@@ -1340,23 +2230,197 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```json
 {
   "success": true,
+  "count": 6,
+  "total": 6,
+  "unreadCount": 3,
+  "page": 1,
+  "pages": 1,
   "notifications": [
     {
       "id": "507f1f77bcf86cd799439016",
-      "type": "order",
-      "title": "New Order #ORD-2024-001",
-      "message": "Jane Smith placed an order for 2 items",
-      "read": false,
-      "createdAt": "2024-01-15T00:00:00.000Z"
+      "type": "Order",
+      "title": "New Order #INS42586",
+      "message": "John D. Placed an order for 3 items with a total of $45.97.",
+      "icon": "order",
+      "isRead": false,
+      "timeAgo": "30 minutes ago",
+      "dateGroup": "Today",
+      "createdAt": "2024-01-15T14:30:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439013",
+      "relatedType": "Order",
+      "metadata": {
+        "orderNumber": "INS42586",
+        "customerName": "John D.",
+        "itemsCount": 3,
+        "totalAmount": 45.97
+      }
+    },
+    {
+      "id": "507f1f77bcf86cd799439017",
+      "type": "Product",
+      "title": "Low Stock Alert",
+      "message": "Your product 'Copper Pipes (10pcs)' has low stock (only 8 units left).",
+      "icon": "alert",
+      "isRead": false,
+      "timeAgo": "2 hours ago",
+      "dateGroup": "Today",
+      "createdAt": "2024-01-15T12:00:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439012",
+      "relatedType": "Product",
+      "metadata": {
+        "productName": "Copper Pipes (10pcs)",
+        "stockLevel": 8
+      }
+    },
+    {
+      "id": "507f1f77bcf86cd799439018",
+      "type": "Campaign",
+      "title": "Campaign Performance",
+      "message": "Your 'Summer Building Materials' campaign is performing well with a 5.2% CTR.",
+      "icon": "campaign",
+      "isRead": false,
+      "timeAgo": "4 hours ago",
+      "dateGroup": "Today",
+      "createdAt": "2024-01-15T10:00:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439020",
+      "relatedType": "Campaign",
+      "metadata": {
+        "campaignName": "Summer Building Materials",
+        "ctr": 5.2
+      }
+    },
+    {
+      "id": "507f1f77bcf86cd799439019",
+      "type": "Order",
+      "title": "Order Delivered",
+      "message": "Order #INS42556 has been delivered.",
+      "icon": "order",
+      "isRead": true,
+      "timeAgo": "Yesterday at 4:32 PM",
+      "dateGroup": "Yesterday",
+      "createdAt": "2024-01-14T16:32:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439014",
+      "relatedType": "Order",
+      "metadata": {
+        "orderNumber": "INS42556"
+      }
+    },
+    {
+      "id": "507f1f77bcf86cd799439020",
+      "type": "Review",
+      "title": "New 5-Star Review",
+      "message": "Micheal K. left a 5-star review: \"Best supplier in the area! Their prices are competitive and...\"",
+      "icon": "review",
+      "isRead": true,
+      "timeAgo": "Yesterday at 2:15 PM",
+      "dateGroup": "Yesterday",
+      "createdAt": "2024-01-14T14:15:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439015",
+      "relatedType": "Review",
+      "metadata": {
+        "customerName": "Micheal K.",
+        "rating": 5
+      }
+    },
+    {
+      "id": "507f1f77bcf86cd799439021",
+      "type": "Payment",
+      "title": "Payment Received",
+      "message": "You received a payment of $89.99 for Order #INS42554",
+      "icon": "payment",
+      "isRead": true,
+      "timeAgo": "Mar 12, 2025",
+      "dateGroup": "Mar 12, 2025",
+      "createdAt": "2024-03-12T00:00:00.000Z",
+      "relatedId": "507f1f77bcf86cd799439013",
+      "relatedType": "Payment",
+      "metadata": {
+        "amount": 89.99,
+        "orderNumber": "INS42554"
+      }
     }
   ],
-  "pagination": { ... }
+  "groupedByDate": {
+    "Today": [
+      {
+        "id": "507f1f77bcf86cd799439016",
+        "type": "Order",
+        "title": "New Order #INS42586",
+        "message": "John D. Placed an order for 3 items with a total of $45.97.",
+        "icon": "order",
+        "isRead": false,
+        "timeAgo": "30 minutes ago",
+        "dateGroup": "Today",
+        "createdAt": "2024-01-15T14:30:00.000Z"
+      },
+      {
+        "id": "507f1f77bcf86cd799439017",
+        "type": "Product",
+        "title": "Low Stock Alert",
+        "message": "Your product 'Copper Pipes (10pcs)' has low stock (only 8 units left).",
+        "icon": "alert",
+        "isRead": false,
+        "timeAgo": "2 hours ago",
+        "dateGroup": "Today",
+        "createdAt": "2024-01-15T12:00:00.000Z"
+      },
+      {
+        "id": "507f1f77bcf86cd799439018",
+        "type": "Campaign",
+        "title": "Campaign Performance",
+        "message": "Your 'Summer Building Materials' campaign is performing well with a 5.2% CTR.",
+        "icon": "campaign",
+        "isRead": false,
+        "timeAgo": "4 hours ago",
+        "dateGroup": "Today",
+        "createdAt": "2024-01-15T10:00:00.000Z"
+      }
+    ],
+    "Yesterday": [
+      {
+        "id": "507f1f77bcf86cd799439019",
+        "type": "Order",
+        "title": "Order Delivered",
+        "message": "Order #INS42556 has been delivered.",
+        "icon": "order",
+        "isRead": true,
+        "timeAgo": "Yesterday at 4:32 PM",
+        "dateGroup": "Yesterday",
+        "createdAt": "2024-01-14T16:32:00.000Z"
+      },
+      {
+        "id": "507f1f77bcf86cd799439020",
+        "type": "Review",
+        "title": "New 5-Star Review",
+        "message": "Micheal K. left a 5-star review: \"Best supplier in the area! Their prices are competitive and...\"",
+        "icon": "review",
+        "isRead": true,
+        "timeAgo": "Yesterday at 2:15 PM",
+        "dateGroup": "Yesterday",
+        "createdAt": "2024-01-14T14:15:00.000Z"
+      }
+    ],
+    "Mar 12, 2025": [
+      {
+        "id": "507f1f77bcf86cd799439021",
+        "type": "Payment",
+        "title": "Payment Received",
+        "message": "You received a payment of $89.99 for Order #INS42554",
+        "icon": "payment",
+        "isRead": true,
+        "timeAgo": "Mar 12, 2025",
+        "dateGroup": "Mar 12, 2025",
+        "createdAt": "2024-03-12T00:00:00.000Z"
+      }
+    ]
+  }
 }
 ```
 
+
 ---
 
-### 35. Mark Notification as Read
+### 39. Mark Notification as Read
 
 **Request:**
 ```http
@@ -1369,13 +2433,31 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 {
   "success": true,
   "message": "Notification marked as read",
-  "notification": { ... }
+  "notification": {
+    "id": "507f1f77bcf86cd799439016",
+    "type": "Order",
+    "title": "New Order #INS42586",
+    "message": "John D. Placed an order for 3 items with a total of $45.97.",
+    "icon": "order",
+    "isRead": true,
+    "timeAgo": "30 minutes ago",
+    "dateGroup": "Today",
+    "createdAt": "2024-01-15T14:30:00.000Z",
+    "relatedId": "507f1f77bcf86cd799439013",
+    "relatedType": "Order",
+    "metadata": {
+      "orderNumber": "INS42586",
+      "customerName": "John D.",
+      "itemsCount": 3,
+      "totalAmount": 45.97
+    }
+  }
 }
 ```
 
 ---
 
-### 36. Mark All Notifications as Read
+### 40. Mark All Notifications as Read
 
 **Request:**
 ```http
@@ -1398,18 +2480,12 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 }
 ```
 
-**Note:** Both `/read-all` and `/mark-all-read` routes work. The `count` field shows how many notifications were marked as read.
 
 ---
-
 ## 📝 Notes
 
-- **All protected routes** require `Authorization: Bearer <token>` header
-- **Image uploads** use `multipart/form-data` content type
-- **All dates** are in ISO 8601 format
-- **Error responses** follow the format: `{ "success": false, "message": "Error message" }`
-
----
-
-**For more details, see `API_DOCUMENTATION.md`**
+- All protected routes require `Authorization: Bearer <token>` header
+- Image uploads use `multipart/form-data` content type
+- All dates are in ISO 8601 format
+- Error responses: `{ "success": false, "message": "Error message" }`
 
