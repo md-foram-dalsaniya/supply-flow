@@ -3,6 +3,9 @@ const generateOTP = require('../utils/generateOTP');
 const sendOTPEmail = require('../utils/sendEmail');
 const generateToken = require('../utils/generateToken');
 
+// OTP expiration time: 1 minute (60 seconds * 1000 milliseconds)
+const OTP_EXPIRE_TIME = 60 * 1000; // 1 minute in milliseconds
+
 exports.register = async (req, res) => {
   try {
     const { businessName, email, password } = req.body;
@@ -51,7 +54,7 @@ exports.register = async (req, res) => {
       try {
         const cloudinary = require('../config/cloudinary');
         const { Readable } = require('stream');
-        
+
         const uploadPromise = new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             {
@@ -82,7 +85,7 @@ exports.register = async (req, res) => {
     }
 
     const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000);
+    const otpExpireTime = new Date(Date.now() + OTP_EXPIRE_TIME);
 
     const user = await User.create({
       name: businessName,
@@ -259,7 +262,7 @@ exports.requestOTP = async (req, res) => {
     }
 
     const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000);
+    const otpExpireTime = new Date(Date.now() + OTP_EXPIRE_TIME);
 
     user.otp = otp;
     user.otpExpireTime = otpExpireTime;
@@ -351,7 +354,7 @@ exports.changeEmailDuringVerification = async (req, res) => {
     user.email = newEmail.toLowerCase();
 
     const otp = generateOTP();
-    const otpExpireTime = new Date(Date.now() + 60 * 1000);
+    const otpExpireTime = new Date(Date.now() + OTP_EXPIRE_TIME);
     user.otp = otp;
     user.otpExpireTime = otpExpireTime;
 
@@ -440,7 +443,7 @@ exports.createTestUsers = async (req, res) => {
         }
 
         const otp = generateOTP();
-        const otpExpireTime = new Date(Date.now() + 60 * 1000);
+        const otpExpireTime = new Date(Date.now() + OTP_EXPIRE_TIME);
 
         const user = await User.create({
           name: testUser.name,
